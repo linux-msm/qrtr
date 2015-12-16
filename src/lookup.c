@@ -38,6 +38,7 @@ static unsigned int read_num_le(const char *str, int *rcp)
 int main(int argc, char **argv)
 {
 	struct sockaddr_qrtr sq;
+	socklen_t sl = sizeof(sq);
 	struct ns_pkt pkt;
 	struct timeval tv;
 	int sock;
@@ -63,8 +64,10 @@ int main(int argc, char **argv)
 	if (sock < 0)
 		err(1, "sock(AF_QIPCRTR)");
 
-	sq.sq_family = AF_QIPCRTR;
-	sq.sq_node = 0;
+	rc = getsockname(sock, (void *)&sq, &sl);
+	if (rc || sq.sq_family != AF_QIPCRTR || sl != sizeof(sq))
+		err(1, "getsockname()");
+
 	sq.sq_port = NS_PORT;
 
 	tv.tv_sec = 1;

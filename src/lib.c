@@ -15,6 +15,23 @@
 #define LOGW(fmt, ...) do { fprintf(stderr, "W|qrtr: " fmt "\n", ##__VA_ARGS__); } while (0)
 #define LOGE_errno(fmt, ...) do { fprintf(stderr, "E|qrtr: " fmt ": %s\n", ##__VA_ARGS__, strerror(errno)); } while (0)
 
+static int qrtr_getname(int sock, struct sockaddr_qrtr *sq)
+{
+	socklen_t sl = sizeof(*sq);
+	int rc;
+
+	rc = getsockname(sock, (void *)sq, &sl);
+	if (rc) {
+		LOGE_errno("getsockname()");
+		return -1;
+	}
+
+	if (sq->sq_family != AF_QIPCRTR || sl != sizeof(*sq))
+		return -1;
+
+	return 0;
+}
+
 int qrtr_open(int rport)
 {
 	struct timeval tv;
@@ -81,7 +98,11 @@ int qrtr_sendto(int sock, u32 node, u32 port, const void *data, unsigned int sz)
 
 int qrtr_publish(int sock, u32 service, u32 instance)
 {
+	struct sockaddr_qrtr sq;
 	struct ns_pkt pkt;
+
+	if (qrtr_getname(sock, &sq))
+		return -1;
 
 	memset(&pkt, 0, sizeof(pkt));
 
@@ -89,12 +110,16 @@ int qrtr_publish(int sock, u32 service, u32 instance)
 	pkt.publish.service = cpu_to_le32(service);
 	pkt.publish.instance = cpu_to_le32(instance);
 
-	return qrtr_sendto(sock, 0, NS_PORT, &pkt, sizeof(pkt));
+	return qrtr_sendto(sock, sq.sq_node, NS_PORT, &pkt, sizeof(pkt));
 }
 
 int qrtr_bye(int sock, u32 service, u32 instance)
 {
+	struct sockaddr_qrtr sq;
 	struct ns_pkt pkt;
+
+	if (qrtr_getname(sock, &sq))
+		return -1;
 
 	memset(&pkt, 0, sizeof(pkt));
 
@@ -102,7 +127,7 @@ int qrtr_bye(int sock, u32 service, u32 instance)
 	pkt.bye.service = cpu_to_le32(service);
 	pkt.bye.instance = cpu_to_le32(instance);
 
-	return qrtr_sendto(sock, 0, NS_PORT, &pkt, sizeof(pkt));
+	return qrtr_sendto(sock, sq.sq_node, NS_PORT, &pkt, sizeof(pkt));
 }
 
 int qrtr_poll(int sock, unsigned int ms)
@@ -148,9 +173,13 @@ int qrtr_recvfrom(int sock, void *buf, unsigned int bsz, u32 *node, u32 *port)
 int qrtr_lookup(int sock, u32 service, u32 instance, u32 ifilter,
 		void (* cb)(void *,u32,u32,u32,u32), void *udata)
 {
+	struct sockaddr_qrtr sq;
 	struct ns_pkt pkt;
 	int len;
 	int rc;
+
+	if (qrtr_getname(sock, &sq))
+		return -1;
 
 	memset(&pkt, 0, sizeof(pkt));
 
@@ -159,7 +188,7 @@ int qrtr_lookup(int sock, u32 service, u32 instance, u32 ifilter,
 	pkt.query.instance = cpu_to_le32(instance);
 	pkt.query.service = cpu_to_le32(service);
 
-	rc = qrtr_sendto(sock, 0, NS_PORT, &pkt, sizeof(pkt));
+	rc = qrtr_sendto(sock, sq.sq_node, NS_PORT, &pkt, sizeof(pkt));
 	if (rc < 0)
 		return -1;
 
