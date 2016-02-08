@@ -9,7 +9,7 @@
 #include <poll.h>
 
 #include "qrtr.h"
-#include "lib.h"
+#include "libqrtr.h"
 #include "ns.h"
 
 #define LOGW(fmt, ...) do { fprintf(stderr, "W|qrtr: " fmt "\n", ##__VA_ARGS__); } while (0)

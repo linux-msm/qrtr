@@ -27,9 +27,9 @@ $(proj)-lookup-srcs := \
 	src/util.c \
 
 lib$(proj).so-srcs := \
-	src/lib.c \
+	lib/libqrtr.c \
 
-lib$(proj).so-cflags := -fPIC
+lib$(proj).so-cflags := -fPIC -Isrc
 
 targets := $(proj)-ns $(proj)-lookup lib$(proj).so
 
