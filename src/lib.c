@@ -96,7 +96,7 @@ int qrtr_sendto(int sock, uint32_t node, uint32_t port, const void *data, unsign
 	return 0;
 }
 
-int qrtr_publish(int sock, uint32_t service, uint32_t instance)
+int qrtr_publish(int sock, uint32_t service, uint16_t version, uint16_t instance)
 {
 	struct sockaddr_qrtr sq;
 	struct ns_pkt pkt;
@@ -108,12 +108,12 @@ int qrtr_publish(int sock, uint32_t service, uint32_t instance)
 
 	pkt.type = cpu_to_le32(NS_PKT_PUBLISH);
 	pkt.publish.service = cpu_to_le32(service);
-	pkt.publish.instance = cpu_to_le32(instance);
+	pkt.publish.instance = cpu_to_le32(instance << 16 | version);
 
 	return qrtr_sendto(sock, sq.sq_node, NS_PORT, &pkt, sizeof(pkt));
 }
 
-int qrtr_bye(int sock, uint32_t service, uint32_t instance)
+int qrtr_bye(int sock, uint32_t service, uint16_t version, uint16_t instance)
 {
 	struct sockaddr_qrtr sq;
 	struct ns_pkt pkt;
@@ -125,7 +125,7 @@ int qrtr_bye(int sock, uint32_t service, uint32_t instance)
 
 	pkt.type = cpu_to_le32(NS_PKT_BYE);
 	pkt.bye.service = cpu_to_le32(service);
-	pkt.bye.instance = cpu_to_le32(instance);
+	pkt.bye.instance = cpu_to_le32(instance << 16 | version);
 
 	return qrtr_sendto(sock, sq.sq_node, NS_PORT, &pkt, sizeof(pkt));
 }
@@ -170,7 +170,7 @@ int qrtr_recvfrom(int sock, void *buf, unsigned int bsz, uint32_t *node, uint32_
 	return rc;
 }
 
-int qrtr_lookup(int sock, uint32_t service, uint32_t instance, uint32_t ifilter,
+int qrtr_lookup(int sock, uint32_t service, uint16_t version, uint16_t  instance, uint32_t ifilter,
 		void (* cb)(void *,uint32_t,uint32_t,uint32_t,uint32_t), void *udata)
 {
 	struct sockaddr_qrtr sq;
@@ -185,7 +185,7 @@ int qrtr_lookup(int sock, uint32_t service, uint32_t instance, uint32_t ifilter,
 
 	pkt.type = cpu_to_le32(NS_PKT_QUERY);
 	pkt.query.ifilter = cpu_to_le32(ifilter);
-	pkt.query.instance = cpu_to_le32(instance);
+	pkt.query.instance = cpu_to_le32(instance << 16 | version);
 	pkt.query.service = cpu_to_le32(service);
 
 	rc = qrtr_sendto(sock, sq.sq_node, NS_PORT, &pkt, sizeof(pkt));
