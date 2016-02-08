@@ -130,6 +130,35 @@ static int server_query(const struct server_filter *f, struct list *list)
 	return count;
 }
 
+static int annouce_servers(int sock, struct sockaddr_qrtr *sq)
+{
+	struct map_entry *me;
+	struct ctrl_pkt cmsg;
+	struct server *srv;
+	int rc;
+
+	map_for_each(&servers, me) {
+		srv = map_iter_data(me, struct server, mi);
+		if (srv->node != 1)
+			continue;
+
+		dprintf("advertising server [%d:%x]@[%d:%d]\n", srv->service, srv->instance, srv->node, srv->port);
+
+		cmsg.cmd = cpu_to_le32(QRTR_CMD_NEW_SERVER);
+		cmsg.server.service = cpu_to_le32(srv->service);
+		cmsg.server.instance = cpu_to_le32(srv->instance);
+		cmsg.server.node = cpu_to_le32(srv->node);
+		cmsg.server.port = cpu_to_le32(srv->port);
+		rc = sendto(sock, &cmsg, sizeof(cmsg), 0, (void *)sq, sizeof(*sq));
+		if (rc < 0) {
+			warn("sendto()");
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
 static struct server *server_add(unsigned int service, unsigned int instance,
 	unsigned int node, unsigned int port)
 {
@@ -216,6 +245,8 @@ static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 	switch (cmd) {
 	case QRTR_CMD_HELLO:
 		rc = sendto(sock, buf, len, 0, (void *)&sq, sizeof(sq));
+		if (rc > 0)
+			rc = annouce_servers(sock, &sq);
 		break;
 	case QRTR_CMD_EXIT:
 	case QRTR_CMD_PING:
