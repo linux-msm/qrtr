@@ -57,7 +57,7 @@ int qrtr_open(int rport)
 		struct sockaddr_qrtr sq;
 
 		sq.sq_family = AF_QIPCRTR;
-		sq.sq_node = 0;
+		sq.sq_node = 1;
 		sq.sq_port = rport;
 
 		rc = bind(sock, (void *)&sq, sizeof(sq));

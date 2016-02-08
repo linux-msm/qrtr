@@ -415,7 +415,7 @@ static int qrtr_socket(int port)
 	}
 
 	sq.sq_family = AF_QIPCRTR;
-	sq.sq_node = 0;
+	sq.sq_node = 1;
 	sq.sq_port = port;
 
 	rc = bind(sock, (void *)&sq, sizeof(sq));
