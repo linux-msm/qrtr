@@ -78,7 +78,7 @@ void qrtr_close(int sock)
 	close(sock);
 }
 
-int qrtr_sendto(int sock, u32 node, u32 port, const void *data, unsigned int sz)
+int qrtr_sendto(int sock, uint32_t node, uint32_t port, const void *data, unsigned int sz)
 {
 	struct sockaddr_qrtr sq;
 	int rc;
@@ -96,7 +96,7 @@ int qrtr_sendto(int sock, u32 node, u32 port, const void *data, unsigned int sz)
 	return 0;
 }
 
-int qrtr_publish(int sock, u32 service, u32 instance)
+int qrtr_publish(int sock, uint32_t service, uint32_t instance)
 {
 	struct sockaddr_qrtr sq;
 	struct ns_pkt pkt;
@@ -113,7 +113,7 @@ int qrtr_publish(int sock, u32 service, u32 instance)
 	return qrtr_sendto(sock, sq.sq_node, NS_PORT, &pkt, sizeof(pkt));
 }
 
-int qrtr_bye(int sock, u32 service, u32 instance)
+int qrtr_bye(int sock, uint32_t service, uint32_t instance)
 {
 	struct sockaddr_qrtr sq;
 	struct ns_pkt pkt;
@@ -151,7 +151,7 @@ int qrtr_recv(int sock, void *buf, unsigned int bsz)
 	return rc;
 }
 
-int qrtr_recvfrom(int sock, void *buf, unsigned int bsz, u32 *node, u32 *port)
+int qrtr_recvfrom(int sock, void *buf, unsigned int bsz, uint32_t *node, uint32_t *port)
 {
 	struct sockaddr_qrtr sq;
 	socklen_t sl;
@@ -170,8 +170,8 @@ int qrtr_recvfrom(int sock, void *buf, unsigned int bsz, u32 *node, u32 *port)
 	return rc;
 }
 
-int qrtr_lookup(int sock, u32 service, u32 instance, u32 ifilter,
-		void (* cb)(void *,u32,u32,u32,u32), void *udata)
+int qrtr_lookup(int sock, uint32_t service, uint32_t instance, uint32_t ifilter,
+		void (* cb)(void *,uint32_t,uint32_t,uint32_t,uint32_t), void *udata)
 {
 	struct sockaddr_qrtr sq;
 	struct ns_pkt pkt;

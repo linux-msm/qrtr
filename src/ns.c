@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -9,7 +10,6 @@
 #include "map.h"
 #include "hash.h"
 #include "waiter.h"
-#include "endian.h"
 #include "list.h"
 #include "container.h"
 #include "qrtr.h"
@@ -102,7 +102,7 @@ static struct server *server_lookup(unsigned int node, unsigned int port)
 	struct map_item *mi;
 	unsigned int key;
 
-	key = hash_u64(((u64)node << 16) ^ port);
+	key = hash_u64(((uint64_t)node << 16) ^ port);
 	mi = map_get(&servers, key);
 	if (mi == NULL)
 		return NULL;
@@ -147,7 +147,7 @@ static struct server *server_add(unsigned int service, unsigned int instance,
 	srv->node = node;
 	srv->port = port;
 
-	key = hash_u64(((u64)srv->node << 16) ^ srv->port);
+	key = hash_u64(((uint64_t)srv->node << 16) ^ srv->port);
 	rc = map_reput(&servers, key, &srv->mi, &mi);
 	if (rc) {
 		free(srv);

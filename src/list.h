@@ -2,7 +2,6 @@
 #define _LIST_H_
 
 #include "container.h"
-#include "types.h"
 
 struct list_item {
 	struct list_item *next;

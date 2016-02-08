@@ -29,11 +29,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <poll.h>
 
-#include "types.h"
 #include "list.h"
 #include "waiter.h"
 #include "util.h"
@@ -117,7 +117,7 @@ struct waiter_ticket {
 		void *data;
 	} callback;
 
-	u64 start;
+	uint64_t start;
 	int updated;
 	struct waiter *waiter;
 	struct list_item list_item;
@@ -188,13 +188,13 @@ void waiter_wait(struct waiter *w)
 	struct pollset *ps = w->pollset;
 	struct waiter_ticket *ticket;
 	struct list_item *node;
-	u64 term_time;
-	u64 now;
+	uint64_t term_time;
+	uint64_t now;
 	int rc;
 
 	pollset_reset(ps);
 
-	term_time = (u64)-1;
+	term_time = (uint64_t)-1;
 	list_for_each(&w->tickets, node) {
 		ticket = list_entry(node, struct waiter_ticket, list_item);
 		switch (ticket->type) {
@@ -210,14 +210,14 @@ void waiter_wait(struct waiter *w)
 		}
 	}
 
-	if (term_time == (u64)-1) { /* wait forever */
+	if (term_time == (uint64_t)-1) { /* wait forever */
 		rc = pollset_wait(ps, -1);
 	} else {
 		now = time_ms();
 		if (now >= term_time) { /* already past timeout, skip poll */
 			rc = 0;
 		} else {
-			u64 delta;
+			uint64_t delta;
 
 			delta = term_time - now;
 			if (delta > ((1u << 31) - 1))
