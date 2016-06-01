@@ -15,6 +15,9 @@ CC := $(CROSS_COMPILE)gcc
 endif
 SFLAGS := -I$(shell $(CC) -print-file-name=include) -Wno-non-pointer-null
 
+$(proj)-cfg-srcs := \
+	src/cfg.c
+
 $(proj)-ns-srcs := \
 	src/ns.c \
 	src/map.c \
@@ -31,7 +34,7 @@ lib$(proj).so-srcs := \
 
 lib$(proj).so-cflags := -fPIC -Isrc
 
-targets := $(proj)-ns $(proj)-lookup lib$(proj).so
+targets := $(proj)-ns $(proj)-cfg $(proj)-lookup lib$(proj).so
 
 out := out
 src_to_obj = $(patsubst %.c,$(out)/obj/%.o,$(1))
