@@ -436,6 +436,7 @@ out:
 static int qrtr_socket(int port)
 {
 	struct sockaddr_qrtr sq;
+	socklen_t sl = sizeof(sq);
 	int sock;
 	int rc;
 
@@ -445,8 +446,11 @@ static int qrtr_socket(int port)
 		return -1;
 	}
 
-	sq.sq_family = AF_QIPCRTR;
-	sq.sq_node = 1;
+	rc = getsockname(sock, (void*)&sq, &sl);
+	if (rc < 0 || sq.sq_node == -1) {
+		warn("getsockname()");
+		return -1;
+	}
 	sq.sq_port = port;
 
 	rc = bind(sock, (void *)&sq, sizeof(sq));
