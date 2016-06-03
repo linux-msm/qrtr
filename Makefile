@@ -57,25 +57,45 @@ endif
 	@$(CC) -MM -MF $(call src_to_dep,$<) -MP -MT "$@ $(call src_to_dep,$<)" $(CFLAGS) $(_CFLAGS) $<
 	@$(CC) -o $@ -c $< $(CFLAGS) $(_CFLAGS)
 
-define add-target
+define add-target-deps
 all-srcs += $($1-srcs)
 all-objs += $(call src_to_obj,$($1-srcs))
 all-deps += $(call src_to_dep,$($1-srcs))
 all-clean += $1
 $(call src_to_obj,$($1-srcs)): _CFLAGS := $($1-cflags)
+endef
+
+define add-bin-target
+
+$(call add-target-deps,$1)
 
 $1: $(call src_to_obj,$($1-srcs))
 	@echo "LD	$$@"
-	@$$(CC) -o $$@ $$(filter %.o,$$^) $(LDFLAGS) $2
+	$$(CC) -o $$@ $$(filter %.o,$$^) $(LDFLAGS) -static
 
-$3: $1
+$(PREFIX)/bin/$1: $1
 	@echo "INSTALL	$$<"
 	@install -D -m 755 $$< $$@
 
-all-install += $3
+all-install += $(PREFIX)/bin/$1
 endef
-add-bin-target = $(call add-target,$1,-static,$(PREFIX)/bin/$1)
-add-lib-target = $(call add-target,$1,-shared,$(PREFIX)/lib/$1)
+
+define add-lib-target
+
+$(call add-target-deps,$1)
+
+$1: $(call src_to_obj,$($1-srcs))
+	@echo "LD	$$@"
+	$$(CC) -o $$@ $$(filter %.o,$$^) $(LDFLAGS) -shared -Wl,-soname,$1.$(proj-major)
+
+$(PREFIX)/lib/$1.$(proj-version): $1
+	@echo "INSTALL	$$<"
+	@install -D -m 755 $$< $$@
+	@ln -sf $1.$(proj-version) $(PREFIX)/lib/$1.$(proj-major)
+	@ln -sf $1.$(proj-major) $(PREFIX)/lib/$1
+
+all-install += $(PREFIX)/lib/$1.$(proj-version)
+endef
 
 $(foreach v,$(filter-out %.so,$(targets)),$(eval $(call add-bin-target,$v)))
 $(foreach v,$(filter %.so,$(targets)),$(eval $(call add-lib-target,$v)))
