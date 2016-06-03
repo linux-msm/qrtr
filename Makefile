@@ -70,7 +70,7 @@ $1: $(call src_to_obj,$($1-srcs))
 
 $3: $1
 	@echo "INSTALL	$$<"
-	@install -m 755 $$< $$@
+	@install -D -m 755 $$< $$@
 
 all-install += $3
 endef
