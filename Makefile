@@ -57,6 +57,14 @@ endif
 	@$(CC) -MM -MF $(call src_to_dep,$<) -MP -MT "$@ $(call src_to_dep,$<)" $(CFLAGS) $(_CFLAGS) $<
 	@$(CC) -o $@ -c $< $(CFLAGS) $(_CFLAGS)
 
+define add-inc-target
+$(PREFIX)/include/$2: $1/$2
+	@echo "INSTALL	$$<"
+	@install -D -m 755 $$< $$@
+
+all-install += $(PREFIX)/include/$2
+endef
+
 define add-target-deps
 all-srcs += $($1-srcs)
 all-objs += $(call src_to_obj,$($1-srcs))
