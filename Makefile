@@ -107,6 +107,7 @@ endef
 
 $(foreach v,$(filter-out %.so,$(targets)),$(eval $(call add-bin-target,$v)))
 $(foreach v,$(filter %.so,$(targets)),$(eval $(call add-lib-target,$v)))
+$(eval $(call add-inc-target,lib,libqrtr.h))
 
 install: $(all-install)
 
