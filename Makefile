@@ -6,9 +6,7 @@ proj-version := $(proj-major).$(proj-minor)
 CFLAGS := -Wall -g
 LDFLAGS :=
 
-ifeq ($(PREFIX),)
-PREFIX := /usr
-endif
+prefix := /usr/local
 
 ifneq ($(CROSS_COMPILE),)
 CC := $(CROSS_COMPILE)gcc
@@ -58,11 +56,11 @@ endif
 	@$(CC) -o $@ -c $< $(CFLAGS) $(_CFLAGS)
 
 define add-inc-target
-$(PREFIX)/include/$2: $1/$2
+$(DESTDIR)$(prefix)/include/$2: $1/$2
 	@echo "INSTALL	$$<"
 	@install -D -m 755 $$< $$@
 
-all-install += $(PREFIX)/include/$2
+all-install += $(DESTDIR)$(prefix)/include/$2
 endef
 
 define add-target-deps
@@ -81,11 +79,11 @@ $1: $(call src_to_obj,$($1-srcs))
 	@echo "LD	$$@"
 	$$(CC) -o $$@ $$(filter %.o,$$^) $(LDFLAGS) -static
 
-$(PREFIX)/bin/$1: $1
+$(DESTDIR)$(prefix)/bin/$1: $1
 	@echo "INSTALL	$$<"
 	@install -D -m 755 $$< $$@
 
-all-install += $(PREFIX)/bin/$1
+all-install += $(DESTDIR)$(prefix)/bin/$1
 endef
 
 define add-lib-target
@@ -96,13 +94,13 @@ $1: $(call src_to_obj,$($1-srcs))
 	@echo "LD	$$@"
 	$$(CC) -o $$@ $$(filter %.o,$$^) $(LDFLAGS) -shared -Wl,-soname,$1.$(proj-major)
 
-$(PREFIX)/lib/$1.$(proj-version): $1
+$(DESTDIR)$(prefix)/lib/$1.$(proj-version): $1
 	@echo "INSTALL	$$<"
 	@install -D -m 755 $$< $$@
-	@ln -sf $1.$(proj-version) $(PREFIX)/lib/$1.$(proj-major)
-	@ln -sf $1.$(proj-major) $(PREFIX)/lib/$1
+	@ln -sf $1.$(proj-version) $(DESTDIR)$(prefix)/lib/$1.$(proj-major)
+	@ln -sf $1.$(proj-major) $(DESTDIR)$(prefix)/lib/$1
 
-all-install += $(PREFIX)/lib/$1.$(proj-version)
+all-install += $(DESTDIR)$(prefix)/lib/$1.$(proj-version)
 endef
 
 $(foreach v,$(filter-out %.so,$(targets)),$(eval $(call add-bin-target,$v)))
