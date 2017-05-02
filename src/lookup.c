@@ -127,10 +127,13 @@ int main(int argc, char **argv)
 	if (rc < 0)
 		err(1, "sendto()");
 
+	printf("  Service Node  Port\n");
+
 	while ((len = recv(sock, &pkt, sizeof(pkt), 0)) > 0) {
 		unsigned int type = le32_to_cpu(pkt.type);
 		const char *name = NULL;
 		unsigned int i;
+		char srv_buf[32];
 
 		if (len < sizeof(pkt) || type != NS_PKT_NOTICE) {
 			warn("invalid/short packet");
@@ -154,9 +157,11 @@ int main(int argc, char **argv)
 			name = common_names[i].name;
 		}
 
-		printf("[%d:%x]@[%d:%d] (%s)\n",
-				pkt.notice.service,
-				pkt.notice.instance,
+		snprintf(srv_buf, sizeof(srv_buf), "%d:%d",
+			 pkt.notice.service, pkt.notice.instance);
+
+		printf("%9s %4d %5d (%s)\n",
+				srv_buf,
 				pkt.notice.node,
 				pkt.notice.port,
 				name ? name : "<unknown>");
