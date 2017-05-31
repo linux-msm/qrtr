@@ -3,7 +3,10 @@
 
 #include <stdint.h>
 
+#ifndef AF_QIPCRTR
 #define AF_QIPCRTR 42
+#endif
+
 struct sockaddr_qrtr {
 	unsigned short sq_family;
 	uint32_t sq_node;
