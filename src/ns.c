@@ -294,27 +294,6 @@ static int say_hello(int sock)
 	return 0;
 }
 
-static int announce_reset(int sock)
-{
-	struct sockaddr_qrtr sq;
-	struct ns_pkt pkt;
-	int rc;
-
-	sq.sq_family = AF_QIPCRTR;
-	sq.sq_node = QRTRADDR_ANY;
-	sq.sq_port = NS_PORT;
-
-	memset(&pkt, 0, sizeof(pkt));
-	pkt.type = cpu_to_le32(NS_PKT_RESET);
-
-	rc = sendto(sock, &pkt, sizeof(pkt), 0, (void *)&sq, sizeof(sq));
-	if (rc < 0)
-		return rc;
-
-	return 0;
-
-}
-
 static void ns_port_fn(void *vcontext, struct waiter_ticket *tkt)
 {
 	struct context *ctx = vcontext;
@@ -494,10 +473,6 @@ int main(int argc, char **argv)
 	rc = say_hello(ctx.ctrl_sock);
 	if (rc)
 		err(1, "unable to say hello");
-
-	rc = announce_reset(ctx.ns_sock);
-	if (rc)
-		err(1, "unable to announce reset");
 
 	if (fork() != 0) {
 		close(ctx.ctrl_sock);
