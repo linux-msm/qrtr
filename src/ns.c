@@ -84,7 +84,44 @@ struct server {
 	struct list_item qli;
 };
 
-static struct map servers;
+struct node {
+	unsigned int id;
+
+	struct map_item mi;
+	struct map services;
+};
+
+static struct map nodes;
+
+static struct node *node_get(unsigned int node_id)
+{
+	struct map_item *mi;
+	struct node *node;
+	int rc;
+
+	mi = map_get(&nodes, hash_u32(node_id));
+	if (mi)
+		return container_of(mi, struct node, mi);
+
+	node = calloc(1, sizeof(*node));
+	if (!node)
+		return NULL;
+
+	node->id = node_id;
+
+	rc = map_create(&node->services);
+	if (rc)
+		errx(1, "unable to create map");
+
+	rc = map_put(&nodes, hash_u32(node_id), &node->mi);
+	if (rc) {
+		map_destroy(&node->services);
+		free(node);
+		return NULL;
+	}
+
+	return node;
+}
 
 static int server_match(const struct server *srv, const struct server_filter *f)
 {
@@ -97,34 +134,27 @@ static int server_match(const struct server *srv, const struct server_filter *f)
 	return (srv->instance & ifilter) == f->instance;
 }
 
-static struct server *server_lookup(unsigned int node, unsigned int port)
-{
-	struct map_item *mi;
-	unsigned int key;
-
-	key = hash_u64(((uint64_t)node << 16) ^ port);
-	mi = map_get(&servers, key);
-	if (mi == NULL)
-		return NULL;
-
-	return container_of(mi, struct server, mi);
-}
-
 static int server_query(const struct server_filter *f, struct list *list)
 {
+	struct map_entry *node_me;
 	struct map_entry *me;
+	struct node *node;
 	int count = 0;
 
 	list_init(list);
-	map_for_each(&servers, me) {
-		struct server *srv;
+	map_for_each(&nodes, node_me) {
+		node = map_iter_data(node_me, struct node, mi);
 
-		srv = map_iter_data(me, struct server, mi);
-		if (!server_match(srv, f))
-			continue;
+		map_for_each(&node->services, me) {
+			struct server *srv;
 
-		list_append(list, &srv->qli);
-		++count;
+			srv = map_iter_data(me, struct server, mi);
+			if (!server_match(srv, f))
+				continue;
+
+			list_append(list, &srv->qli);
+			++count;
+		}
 	}
 
 	return count;
@@ -132,15 +162,26 @@ static int server_query(const struct server_filter *f, struct list *list)
 
 static int annouce_servers(int sock, struct sockaddr_qrtr *sq)
 {
+	struct sockaddr_qrtr local_sq;
 	struct map_entry *me;
 	struct ctrl_pkt cmsg;
 	struct server *srv;
+	struct node *node;
+	socklen_t sl = sizeof(local_sq);
 	int rc;
 
-	map_for_each(&servers, me) {
+	rc = getsockname(sock, (void*)&sq, &sl);
+	if (rc < 0) {
+		warn("getsockname()");
+		return -1;
+	}
+
+	node = node_get(local_sq.sq_node);
+	if (!node)
+		return 0;
+
+	map_for_each(&node->services, me) {
 		srv = map_iter_data(me, struct server, mi);
-		if (srv->node != 1)
-			continue;
 
 		dprintf("advertising server [%d:%x]@[%d:%d]\n", srv->service, srv->instance, srv->node, srv->port);
 
@@ -160,11 +201,11 @@ static int annouce_servers(int sock, struct sockaddr_qrtr *sq)
 }
 
 static struct server *server_add(unsigned int service, unsigned int instance,
-	unsigned int node, unsigned int port)
+	unsigned int node_id, unsigned int port)
 {
 	struct map_item *mi;
 	struct server *srv;
-	unsigned int key;
+	struct node *node;
 	int rc;
 
 	srv = calloc(1, sizeof(*srv));
@@ -173,15 +214,16 @@ static struct server *server_add(unsigned int service, unsigned int instance,
 
 	srv->service = service;
 	srv->instance = instance;
-	srv->node = node;
+	srv->node = node_id;
 	srv->port = port;
 
-	key = hash_u64(((uint64_t)srv->node << 16) ^ srv->port);
-	rc = map_reput(&servers, key, &srv->mi, &mi);
-	if (rc) {
-		free(srv);
-		return NULL;
-	}
+	node = node_get(node_id);
+	if (!node)
+		goto err;
+
+	rc = map_reput(&node->services, hash_u32(port), &srv->mi, &mi);
+	if (rc)
+		goto err;
 
 	dprintf("add server [%d:%x]@[%d:%d]\n", srv->service, srv->instance,
 			srv->node, srv->port);
@@ -192,15 +234,28 @@ static struct server *server_add(unsigned int service, unsigned int instance,
 	}
 
 	return srv;
+
+err:
+	free(srv);
+	return NULL;
 }
 
-static struct server *server_del(unsigned int node, unsigned int port)
+static struct server *server_del(unsigned int node_id, unsigned int port)
 {
+	struct map_item *mi;
 	struct server *srv;
+	struct node *node;
 
-	srv = server_lookup(node, port);
-	if (srv != NULL)
-		map_remove(&servers, srv->mi.key);
+	node = node_get(node_id);
+	if (!node)
+		return NULL;
+
+	mi = map_get(&node->services, hash_u32(port));
+	if (!mi)
+		return NULL;
+
+	srv = container_of(mi, struct server, mi);
+	map_remove(&node->services, srv->mi.key);
 
 	return srv;
 }
@@ -447,6 +502,16 @@ static void server_mi_free(struct map_item *mi)
 	free(container_of(mi, struct server, mi));
 }
 
+static void node_mi_free(struct map_item *mi)
+{
+	struct node *node = container_of(mi, struct node, mi);
+
+	map_clear(&node->services, server_mi_free);
+	map_destroy(&node->services);
+
+	free(node);
+}
+
 int main(int argc, char **argv)
 {
 	struct waiter_ticket *tkt;
@@ -458,9 +523,9 @@ int main(int argc, char **argv)
 	if (w == NULL)
 		errx(1, "unable to create waiter");
 
-	rc = map_create(&servers);
+	rc = map_create(&nodes);
 	if (rc)
-		errx(1, "unable to create map");
+		errx(1, "unable to create node map");
 
 	ctx.ctrl_sock = qrtr_socket(QRTR_CTRL_PORT);
 	if (ctx.ctrl_sock < 0)
@@ -492,8 +557,9 @@ int main(int argc, char **argv)
 	puts("exiting cleanly");
 
 	waiter_destroy(w);
-	map_clear(&servers, server_mi_free);
-	map_destroy(&servers);
+
+	map_clear(&nodes, node_mi_free);
+	map_destroy(&nodes);
 
 	return 0;
 }
