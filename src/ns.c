@@ -349,18 +349,112 @@ static int say_hello(int sock)
 	return 0;
 }
 
+static void ns_pkt_publish(int sock, struct sockaddr_qrtr *sq_src,
+			   unsigned int service, unsigned int instance)
+{
+	struct sockaddr_qrtr sq;
+	struct ctrl_pkt cmsg;
+	struct server *srv;
+	int rc;
+
+	srv = server_add(service, instance, sq_src->sq_node, sq_src->sq_port);
+	if (srv == NULL) {
+		warn("unable to add server");
+		return;
+	}
+
+	cmsg.cmd = cpu_to_le32(QRTR_CMD_NEW_SERVER);
+	cmsg.server.service = cpu_to_le32(srv->service);
+	cmsg.server.instance = cpu_to_le32(srv->instance);
+	cmsg.server.node = cpu_to_le32(srv->node);
+	cmsg.server.port = cpu_to_le32(srv->port);
+
+	sq.sq_family = AF_QIPCRTR;
+	sq.sq_node = QRTRADDR_ANY;
+	sq.sq_port = QRTR_CTRL_PORT;
+
+	rc = sendto(sock, &cmsg, sizeof(cmsg), 0, (void *)&sq, sizeof(sq));
+	if (rc < 0)
+		warn("sendto()");
+}
+
+static void ns_pkt_bye(int sock, struct sockaddr_qrtr *sq_src)
+{
+	struct sockaddr_qrtr sq;
+	struct ctrl_pkt cmsg;
+	struct server *srv;
+	int rc;
+
+	srv = server_del(sq_src->sq_node, sq_src->sq_port);
+	if (srv == NULL) {
+		warn("bye from to unregistered server");
+		return;
+	}
+	cmsg.cmd = cpu_to_le32(QRTR_CMD_DEL_SERVER);
+	cmsg.server.service = cpu_to_le32(srv->service);
+	cmsg.server.instance = cpu_to_le32(srv->instance);
+	cmsg.server.node = cpu_to_le32(srv->node);
+	cmsg.server.port = cpu_to_le32(srv->port);
+	free(srv);
+
+	sq.sq_family = AF_QIPCRTR;
+	sq.sq_node = QRTRADDR_ANY;
+	sq.sq_port = QRTR_CTRL_PORT;
+
+	rc = sendto(sock, &cmsg, sizeof(cmsg), 0, (void *)&sq, sizeof(sq));
+	if (rc < 0)
+		warn("sendto()");
+}
+
+static void ns_pkt_query(int sock, struct sockaddr_qrtr *sq,
+			 struct server_filter *filter)
+{
+	struct list reply_list;
+	struct list_item *li;
+	struct ns_pkt opkt;
+	int seq;
+	int rc;
+
+	seq = server_query(filter, &reply_list);
+
+	memset(&opkt, 0, sizeof(opkt));
+	opkt.type = NS_PKT_NOTICE;
+	list_for_each(&reply_list, li) {
+		struct server *srv = container_of(li, struct server, qli);
+
+		opkt.notice.seq = cpu_to_le32(seq);
+		opkt.notice.service = cpu_to_le32(srv->service);
+		opkt.notice.instance = cpu_to_le32(srv->instance);
+		opkt.notice.node = cpu_to_le32(srv->node);
+		opkt.notice.port = cpu_to_le32(srv->port);
+		rc = sendto(sock, &opkt, sizeof(opkt),
+				0, (void *)sq, sizeof(*sq));
+		if (rc < 0) {
+			warn("sendto()");
+			break;
+		}
+		--seq;
+	}
+	if (rc < 0)
+		return;
+
+	memset(&opkt, 0, sizeof(opkt));
+	opkt.type = NS_PKT_NOTICE;
+	rc = sendto(sock, &opkt, sizeof(opkt), 0, (void *)sq, sizeof(*sq));
+	if (rc < 0)
+		warn("sendto()");
+}
+
 static void ns_port_fn(void *vcontext, struct waiter_ticket *tkt)
 {
 	struct context *ctx = vcontext;
+	struct server_filter filter;
 	struct sockaddr_qrtr sq;
 	int sock = ctx->ns_sock;
-	struct ctrl_pkt cmsg;
-	struct server *srv;
 	struct ns_pkt *msg;
 	char buf[4096];
 	socklen_t sl;
 	ssize_t len;
-	int rc;
 
 	sl = sizeof(sq);
 	len = recvfrom(sock, buf, sizeof(buf), 0, (void *)&sq, &sl);
@@ -379,86 +473,22 @@ static void ns_port_fn(void *vcontext, struct waiter_ticket *tkt)
 		goto out;
 	}
 
-	rc = 0;
 	switch (le32_to_cpu(msg->type)) {
 	case NS_PKT_PUBLISH:
-		srv = server_add(le32_to_cpu(msg->publish.service),
-				le32_to_cpu(msg->publish.instance),
-				sq.sq_node, sq.sq_port);
-		if (srv == NULL) {
-			warn("unable to add server");
-			break;
-		}
-		cmsg.cmd = cpu_to_le32(QRTR_CMD_NEW_SERVER);
-		cmsg.server.service = cpu_to_le32(srv->service);
-		cmsg.server.instance = cpu_to_le32(srv->instance);
-		cmsg.server.node = cpu_to_le32(srv->node);
-		cmsg.server.port = cpu_to_le32(srv->port);
-		sq.sq_node = QRTRADDR_ANY;
-		sq.sq_port = QRTR_CTRL_PORT;
-		rc = sendto(ctx->ctrl_sock, &cmsg, sizeof(cmsg), 0, (void *)&sq, sizeof(sq));
-		if (rc < 0)
-			warn("sendto()");
+		ns_pkt_publish(ctx->ctrl_sock, &sq,
+			       le32_to_cpu(msg->publish.service),
+			       le32_to_cpu(msg->publish.instance));
 		break;
 	case NS_PKT_BYE:
-		srv = server_del(sq.sq_node, sq.sq_port);
-		if (srv == NULL) {
-			warn("bye from to unregistered server");
-			break;
-		}
-		cmsg.cmd = cpu_to_le32(QRTR_CMD_DEL_SERVER);
-		cmsg.server.service = cpu_to_le32(srv->service);
-		cmsg.server.instance = cpu_to_le32(srv->instance);
-		cmsg.server.node = cpu_to_le32(srv->node);
-		cmsg.server.port = cpu_to_le32(srv->port);
-		free(srv);
-		sq.sq_node = QRTRADDR_ANY;
-		sq.sq_port = QRTR_CTRL_PORT;
-		rc = sendto(ctx->ctrl_sock, &cmsg, sizeof(cmsg), 0, (void *)&sq, sizeof(sq));
-		if (rc < 0)
-			warn("sendto()");
+		ns_pkt_bye(ctx->ctrl_sock, &sq);
 		break;
-	case NS_PKT_QUERY: {
-		struct server_filter filter = {
-			le32_to_cpu(msg->query.service),
-			le32_to_cpu(msg->query.instance),
-			le32_to_cpu(msg->query.ifilter),
-		};
-		struct list reply_list;
-		struct list_item *li;
-		struct ns_pkt opkt;
-		int seq;
+	case NS_PKT_QUERY:
+		filter.service = le32_to_cpu(msg->query.service);
+		filter.instance = le32_to_cpu(msg->query.instance);
+		filter.ifilter = le32_to_cpu(msg->query.ifilter);
 
-		seq = server_query(&filter, &reply_list);
-
-		memset(&opkt, 0, sizeof(opkt));
-		opkt.type = NS_PKT_NOTICE;
-		list_for_each(&reply_list, li) {
-			struct server *srv = container_of(li, struct server, qli);
-
-			opkt.notice.seq = cpu_to_le32(seq);
-			opkt.notice.service = cpu_to_le32(srv->service);
-			opkt.notice.instance = cpu_to_le32(srv->instance);
-			opkt.notice.node = cpu_to_le32(srv->node);
-			opkt.notice.port = cpu_to_le32(srv->port);
-			rc = sendto(sock, &opkt, sizeof(opkt),
-					0, (void *)&sq, sizeof(sq));
-			if (rc < 0) {
-				warn("sendto()");
-				break;
-			}
-			--seq;
-		}
-		if (rc < 0)
-			break;
-
-		memset(&opkt, 0, sizeof(opkt));
-		opkt.type = NS_PKT_NOTICE;
-		rc = sendto(sock, &opkt, sizeof(opkt), 0, (void *)&sq, sizeof(sq));
-		if (rc < 0)
-			warn("sendto()");
+		ns_pkt_query(sock, &sq, &filter);
 		break;
-	}
 	case NS_PKT_NOTICE:
 		break;
 	}
