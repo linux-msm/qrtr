@@ -67,6 +67,8 @@ static const char *ctrl_pkt_strings[] = {
 struct context {
 	int ctrl_sock;
 	int ns_sock;
+
+	int local_node;
 };
 
 struct server_filter {
@@ -161,23 +163,15 @@ static int server_query(const struct server_filter *f, struct list *list)
 	return count;
 }
 
-static int annouce_servers(int sock, struct sockaddr_qrtr *sq)
+static int annouce_servers(struct context *ctx, struct sockaddr_qrtr *sq)
 {
-	struct sockaddr_qrtr local_sq;
 	struct map_entry *me;
 	struct ctrl_pkt cmsg;
 	struct server *srv;
 	struct node *node;
-	socklen_t sl = sizeof(local_sq);
 	int rc;
 
-	rc = getsockname(sock, (void*)&sq, &sl);
-	if (rc < 0) {
-		warn("getsockname()");
-		return -1;
-	}
-
-	node = node_get(local_sq.sq_node);
+	node = node_get(ctx->local_node);
 	if (!node)
 		return 0;
 
@@ -191,7 +185,7 @@ static int annouce_servers(int sock, struct sockaddr_qrtr *sq)
 		cmsg.server.instance = cpu_to_le32(srv->instance);
 		cmsg.server.node = cpu_to_le32(srv->node);
 		cmsg.server.port = cpu_to_le32(srv->port);
-		rc = sendto(sock, &cmsg, sizeof(cmsg), 0, (void *)sq, sizeof(*sq));
+		rc = sendto(ctx->ctrl_sock, &cmsg, sizeof(cmsg), 0, (void *)sq, sizeof(*sq));
 		if (rc < 0) {
 			warn("sendto()");
 			return rc;
@@ -268,12 +262,12 @@ static int ctrl_cmd_hello(struct context *ctx, struct sockaddr_qrtr *sq,
 
 	rc = sendto(ctx->ctrl_sock, buf, len, 0, (void *)sq, sizeof(*sq));
 	if (rc > 0)
-		rc = annouce_servers(ctx->ctrl_sock, sq);
+		rc = annouce_servers(ctx, sq);
 
 	return rc;
 }
 
-static int ctrl_cmd_bye(struct context *ctx, unsigned int node_id)
+static int ctrl_cmd_bye(struct context *ctx, struct sockaddr_qrtr *sq)
 {
 	return 0;
 }
@@ -349,7 +343,7 @@ static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 		rc = ctrl_cmd_hello(ctx, &sq, buf, len);
 		break;
 	case QRTR_CMD_BYE:
-		rc = ctrl_cmd_bye(ctx, sq.sq_node);
+		rc = ctrl_cmd_bye(ctx, &sq);
 		break;
 	case QRTR_CMD_DEL_CLIENT:
 		rc = ctrl_cmd_del_client(ctx, le32_to_cpu(msg->server.node),
@@ -595,8 +589,10 @@ static void node_mi_free(struct map_item *mi)
 int main(int argc, char **argv)
 {
 	struct waiter_ticket *tkt;
+	struct sockaddr_qrtr sq;
 	struct context ctx;
 	struct waiter *w;
+	socklen_t sl = sizeof(sq);
 	int rc;
 
 	w = waiter_create();
@@ -614,6 +610,12 @@ int main(int argc, char **argv)
 	ctx.ns_sock = qrtr_socket(NS_PORT);
 	if (ctx.ns_sock < 0)
 		errx(1, "unable to create nameserver socket");
+
+	rc = getsockname(ctx.ctrl_sock, (void*)&sq, &sl);
+	if (rc < 0)
+		err(1, "getsockname()");
+
+	ctx.local_node = sq.sq_node;
 
 	rc = say_hello(ctx.ctrl_sock);
 	if (rc)
