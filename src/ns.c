@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <err.h>
+#include <errno.h>
 
 #include "map.h"
 #include "hash.h"
@@ -260,13 +261,59 @@ static struct server *server_del(unsigned int node_id, unsigned int port)
 	return srv;
 }
 
+static int ctrl_cmd_hello(struct context *ctx, struct sockaddr_qrtr *sq,
+			  const void *buf, size_t len)
+{
+	int rc;
+
+	rc = sendto(ctx->ctrl_sock, buf, len, 0, (void *)sq, sizeof(*sq));
+	if (rc > 0)
+		rc = annouce_servers(ctx->ctrl_sock, sq);
+
+	return rc;
+}
+
+static int ctrl_cmd_bye(struct context *ctx, unsigned int node_id)
+{
+	return 0;
+}
+
+static int ctrl_cmd_del_client(struct context *ctx, unsigned node_id,
+			       unsigned port)
+{
+	return 0;
+}
+
+static int ctrl_cmd_new_server(struct context *ctx, unsigned int service,
+			       unsigned int instance, unsigned int node_id,
+			       unsigned int port)
+{
+	struct server *srv;
+
+	srv = server_add(service, instance, node_id, port);
+
+	return srv ? 0 : -EINVAL;
+}
+
+static int ctrl_cmd_del_server(struct context *ctx, unsigned int service,
+			       unsigned int instance, unsigned int node_id,
+			       unsigned int port)
+{
+	struct server *srv;
+
+	srv = server_del(node_id, port);
+	if (srv)
+		free(srv);
+
+	return srv ? 0 : -EINVAL;
+}
+
 static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 {
 	struct context *ctx = vcontext;
 	struct sockaddr_qrtr sq;
 	int sock = ctx->ctrl_sock;
 	struct ctrl_pkt *msg;
-	struct server *srv;
 	unsigned int cmd;
 	char buf[4096];
 	socklen_t sl;
@@ -299,27 +346,30 @@ static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 	rc = 0;
 	switch (cmd) {
 	case QRTR_CMD_HELLO:
-		rc = sendto(sock, buf, len, 0, (void *)&sq, sizeof(sq));
-		if (rc > 0)
-			rc = annouce_servers(sock, &sq);
+		rc = ctrl_cmd_hello(ctx, &sq, buf, len);
+		break;
+	case QRTR_CMD_BYE:
+		rc = ctrl_cmd_bye(ctx, sq.sq_node);
+		break;
+	case QRTR_CMD_DEL_CLIENT:
+		rc = ctrl_cmd_del_client(ctx, le32_to_cpu(msg->server.node),
+					 le32_to_cpu(msg->server.port));
+		break;
+	case QRTR_CMD_NEW_SERVER:
+		rc = ctrl_cmd_new_server(ctx, le32_to_cpu(msg->server.service),
+					 le32_to_cpu(msg->server.instance),
+					 le32_to_cpu(msg->server.node),
+					 le32_to_cpu(msg->server.port));
+		break;
+	case QRTR_CMD_DEL_SERVER:
+		rc = ctrl_cmd_del_server(ctx, le32_to_cpu(msg->server.service),
+					 le32_to_cpu(msg->server.instance),
+					 le32_to_cpu(msg->server.node),
+					 le32_to_cpu(msg->server.port));
 		break;
 	case QRTR_CMD_EXIT:
 	case QRTR_CMD_PING:
-	case QRTR_CMD_BYE:
 	case QRTR_CMD_RESUME_TX:
-	case QRTR_CMD_DEL_CLIENT:
-		break;
-	case QRTR_CMD_NEW_SERVER:
-		server_add(le32_to_cpu(msg->server.service),
-				le32_to_cpu(msg->server.instance),
-				le32_to_cpu(msg->server.node),
-				le32_to_cpu(msg->server.port));
-		break;
-	case QRTR_CMD_DEL_SERVER:
-		srv = server_del(le32_to_cpu(msg->server.node),
-				le32_to_cpu(msg->server.port));
-		if (srv)
-			free(srv);
 		break;
 	}
 
