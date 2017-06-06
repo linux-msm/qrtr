@@ -291,35 +291,35 @@ static int ctrl_cmd_del_client(struct context *ctx, unsigned node_id,
 	struct node *node;
 	int rc;
 
+	/* Remove the server belonging to this port*/
 	srv = server_del(node_id, port);
 	if (srv) {
 		if (srv->node == ctx->local_node)
 			service_announce_del(ctx, &ctx->bcast_sq, srv);
 
 		free(srv);
-	} else {
-		node = node_get(ctx->local_node);
-		if (!node)
-			return 0;
+	}
 
-		pkt.cmd = QRTR_CMD_DEL_CLIENT;
-		pkt.client.node = node_id;
-		pkt.client.port = port;
+	/* Advertise the removal of this client to all local services */
+	node = node_get(ctx->local_node);
+	if (!node)
+		return 0;
 
-		map_for_each(&node->services, me) {
-			srv = map_iter_data(me, struct server, mi);
+	pkt.cmd = QRTR_CMD_DEL_CLIENT;
+	pkt.client.node = node_id;
+	pkt.client.port = port;
 
-			printf("letting %d:%d know about the dying client\n", srv->node, srv->port);
+	map_for_each(&node->services, me) {
+		srv = map_iter_data(me, struct server, mi);
 
-			sq.sq_family = AF_QIPCRTR;
-			sq.sq_node = srv->node;
-			sq.sq_port = srv->port;
+		sq.sq_family = AF_QIPCRTR;
+		sq.sq_node = srv->node;
+		sq.sq_port = srv->port;
 
-			rc = sendto(ctx->ctrl_sock, &pkt, sizeof(pkt), 0,
-				    (struct sockaddr *)&sq, sizeof(sq));
-			if (rc < 0)
-				warn("del_client propagation failed");
-		}
+		rc = sendto(ctx->ctrl_sock, &pkt, sizeof(pkt), 0,
+				(struct sockaddr *)&sq, sizeof(sq));
+		if (rc < 0)
+			warn("del_client propagation failed");
 	}
 
 	return 0;
