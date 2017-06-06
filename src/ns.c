@@ -165,10 +165,57 @@ static int server_query(const struct server_filter *f, struct list *list)
 	return count;
 }
 
+static int service_announce_new(struct context *ctx,
+				struct sockaddr_qrtr *dest,
+				struct server *srv)
+{
+	struct ctrl_pkt cmsg;
+	int rc;
+
+	dprintf("advertising new server [%d:%x]@[%d:%d]\n",
+		srv->service, srv->instance, srv->node, srv->port);
+
+	cmsg.cmd = cpu_to_le32(QRTR_CMD_NEW_SERVER);
+	cmsg.server.service = cpu_to_le32(srv->service);
+	cmsg.server.instance = cpu_to_le32(srv->instance);
+	cmsg.server.node = cpu_to_le32(srv->node);
+	cmsg.server.port = cpu_to_le32(srv->port);
+
+	rc = sendto(ctx->ctrl_sock, &cmsg, sizeof(cmsg), 0,
+		    (struct sockaddr *)dest, sizeof(*dest));
+	if (rc < 0)
+		warn("sendto()");
+
+	return rc;
+}
+
+static int service_announce_del(struct context *ctx,
+				struct sockaddr_qrtr *dest,
+				struct server *srv)
+{
+	struct ctrl_pkt cmsg;
+	int rc;
+
+	dprintf("advertising removal of server [%d:%x]@[%d:%d]\n",
+		srv->service, srv->instance, srv->node, srv->port);
+
+	cmsg.cmd = cpu_to_le32(QRTR_CMD_NEW_SERVER);
+	cmsg.server.service = cpu_to_le32(srv->service);
+	cmsg.server.instance = cpu_to_le32(srv->instance);
+	cmsg.server.node = cpu_to_le32(srv->node);
+	cmsg.server.port = cpu_to_le32(srv->port);
+
+	rc = sendto(ctx->ctrl_sock, &cmsg, sizeof(cmsg), 0,
+		    (struct sockaddr *)dest, sizeof(*dest));
+	if (rc < 0)
+		warn("sendto()");
+
+	return rc;
+}
+
 static int annouce_servers(struct context *ctx, struct sockaddr_qrtr *sq)
 {
 	struct map_entry *me;
-	struct ctrl_pkt cmsg;
 	struct server *srv;
 	struct node *node;
 	int rc;
@@ -180,18 +227,9 @@ static int annouce_servers(struct context *ctx, struct sockaddr_qrtr *sq)
 	map_for_each(&node->services, me) {
 		srv = map_iter_data(me, struct server, mi);
 
-		dprintf("advertising server [%d:%x]@[%d:%d]\n", srv->service, srv->instance, srv->node, srv->port);
-
-		cmsg.cmd = cpu_to_le32(QRTR_CMD_NEW_SERVER);
-		cmsg.server.service = cpu_to_le32(srv->service);
-		cmsg.server.instance = cpu_to_le32(srv->instance);
-		cmsg.server.node = cpu_to_le32(srv->node);
-		cmsg.server.port = cpu_to_le32(srv->port);
-		rc = sendto(ctx->ctrl_sock, &cmsg, sizeof(cmsg), 0, (void *)sq, sizeof(*sq));
-		if (rc < 0) {
-			warn("sendto()");
+		rc = service_announce_new(ctx, sq, srv);
+		if (rc < 0)
 			return rc;
-		}
 	}
 
 	return 0;
@@ -280,15 +318,21 @@ static int ctrl_cmd_del_client(struct context *ctx, unsigned node_id,
 	return 0;
 }
 
-static int ctrl_cmd_new_server(struct context *ctx, unsigned int service,
-			       unsigned int instance, unsigned int node_id,
-			       unsigned int port)
+static int ctrl_cmd_new_server(struct context *ctx, struct sockaddr_qrtr *from,
+			       unsigned int service, unsigned int instance,
+			       unsigned int node_id, unsigned int port)
 {
 	struct server *srv;
+	int rc = 0;
 
 	srv = server_add(service, instance, node_id, port);
+	if (!srv)
+		return -EINVAL;
 
-	return srv ? 0 : -EINVAL;
+	if (srv->node == ctx->local_node)
+		rc = service_announce_new(ctx, &ctx->bcast_sq, srv);
+
+	return rc;
 }
 
 static int ctrl_cmd_del_server(struct context *ctx, unsigned int service,
@@ -296,12 +340,18 @@ static int ctrl_cmd_del_server(struct context *ctx, unsigned int service,
 			       unsigned int port)
 {
 	struct server *srv;
+	int rc = 0;
 
 	srv = server_del(node_id, port);
-	if (srv)
-		free(srv);
+	if (!srv)
+		return -EINVAL;
 
-	return srv ? 0 : -EINVAL;
+	if (srv->node == ctx->local_node)
+		rc = service_announce_del(ctx, &ctx->bcast_sq, srv);
+
+	free(srv);
+
+	return rc;
 }
 
 static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
@@ -352,7 +402,8 @@ static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 					 le32_to_cpu(msg->server.port));
 		break;
 	case QRTR_CMD_NEW_SERVER:
-		rc = ctrl_cmd_new_server(ctx, le32_to_cpu(msg->server.service),
+		rc = ctrl_cmd_new_server(ctx, &sq,
+					 le32_to_cpu(msg->server.service),
 					 le32_to_cpu(msg->server.instance),
 					 le32_to_cpu(msg->server.node),
 					 le32_to_cpu(msg->server.port));
