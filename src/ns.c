@@ -17,38 +17,6 @@
 #include "util.h"
 #include "ns.h"
 
-enum ctrl_pkt_cmd {
-	QRTR_CMD_HELLO		= 2,
-	QRTR_CMD_BYE		= 3,
-	QRTR_CMD_NEW_SERVER	= 4,
-	QRTR_CMD_DEL_SERVER	= 5,
-	QRTR_CMD_DEL_CLIENT	= 6,
-	QRTR_CMD_RESUME_TX	= 7,
-	QRTR_CMD_EXIT		= 8,
-	QRTR_CMD_PING		= 9,
-
-	_QRTR_CMD_CNT,
-	_QRTR_CMD_MAX = _QRTR_CMD_CNT - 1
-};
-
-struct ctrl_pkt {
-	__le32 cmd;
-
-	union {
-		struct {
-			__le32 service;
-			__le32 instance;
-			__le32 node;
-			__le32 port;
-		} server;
-
-		struct {
-			__le32 node;
-			__le32 port;
-		} client;
-	};
-} __attribute__((packed));
-
 static const char *ctrl_pkt_strings[] = {
 	[QRTR_CMD_HELLO]	= "hello",
 	[QRTR_CMD_BYE]		= "bye",
@@ -59,8 +27,6 @@ static const char *ctrl_pkt_strings[] = {
 	[QRTR_CMD_EXIT]		= "exit",
 	[QRTR_CMD_PING]		= "ping",
 };
-
-#define QRTR_CTRL_PORT ((unsigned int)-2)
 
 #define dprintf(...)
 
@@ -169,7 +135,7 @@ static int service_announce_new(struct context *ctx,
 				struct sockaddr_qrtr *dest,
 				struct server *srv)
 {
-	struct ctrl_pkt cmsg;
+	struct qrtr_ctrl_pkt cmsg;
 	int rc;
 
 	dprintf("advertising new server [%d:%x]@[%d:%d]\n",
@@ -193,7 +159,7 @@ static int service_announce_del(struct context *ctx,
 				struct sockaddr_qrtr *dest,
 				struct server *srv)
 {
-	struct ctrl_pkt cmsg;
+	struct qrtr_ctrl_pkt cmsg;
 	int rc;
 
 	dprintf("advertising removal of server [%d:%x]@[%d:%d]\n",
@@ -359,7 +325,7 @@ static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 	struct context *ctx = vcontext;
 	struct sockaddr_qrtr sq;
 	int sock = ctx->ctrl_sock;
-	struct ctrl_pkt *msg;
+	struct qrtr_ctrl_pkt *msg;
 	unsigned int cmd;
 	char buf[4096];
 	socklen_t sl;
@@ -420,14 +386,15 @@ static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 	}
 
 	if (rc < 0)
-		warn("failed while handling packet");
+		warnx("failed while handling packet from %d:%d",
+		      sq.sq_node, sq.sq_port);
 out:
 	waiter_ticket_clear(tkt);
 }
 
 static int say_hello(struct context *ctx)
 {
-	struct ctrl_pkt pkt;
+	struct qrtr_ctrl_pkt pkt;
 	int rc;
 
 	memset(&pkt, 0, sizeof(pkt));
@@ -444,8 +411,8 @@ static int say_hello(struct context *ctx)
 static void ns_pkt_publish(int sock, struct sockaddr_qrtr *sq_src,
 			   unsigned int service, unsigned int instance)
 {
+	struct qrtr_ctrl_pkt cmsg;
 	struct sockaddr_qrtr sq;
-	struct ctrl_pkt cmsg;
 	struct server *srv;
 	int rc;
 
@@ -472,8 +439,8 @@ static void ns_pkt_publish(int sock, struct sockaddr_qrtr *sq_src,
 
 static void ns_pkt_bye(int sock, struct sockaddr_qrtr *sq_src)
 {
+	struct qrtr_ctrl_pkt cmsg;
 	struct sockaddr_qrtr sq;
-	struct ctrl_pkt cmsg;
 	struct server *srv;
 	int rc;
 
