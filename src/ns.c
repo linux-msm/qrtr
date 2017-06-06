@@ -69,6 +69,8 @@ struct context {
 	int ns_sock;
 
 	int local_node;
+
+	struct sockaddr_qrtr bcast_sq;
 };
 
 struct server_filter {
@@ -373,20 +375,16 @@ out:
 	waiter_ticket_clear(tkt);
 }
 
-static int say_hello(int sock)
+static int say_hello(struct context *ctx)
 {
-	struct sockaddr_qrtr sq;
 	struct ctrl_pkt pkt;
 	int rc;
-
-	sq.sq_family = AF_QIPCRTR;
-	sq.sq_node = QRTRADDR_ANY;
-	sq.sq_port = QRTR_CTRL_PORT;
 
 	memset(&pkt, 0, sizeof(pkt));
 	pkt.cmd = cpu_to_le32(QRTR_CMD_HELLO);
 
-	rc = sendto(sock, &pkt, sizeof(pkt), 0, (void *)&sq, sizeof(sq));
+	rc = sendto(ctx->ctrl_sock, &pkt, sizeof(pkt), 0,
+		    (struct sockaddr *)&ctx->bcast_sq, sizeof(ctx->bcast_sq));
 	if (rc < 0)
 		return rc;
 
@@ -617,7 +615,11 @@ int main(int argc, char **argv)
 
 	ctx.local_node = sq.sq_node;
 
-	rc = say_hello(ctx.ctrl_sock);
+	ctx.bcast_sq.sq_family = AF_QIPCRTR;
+	ctx.bcast_sq.sq_node = QRTRADDR_ANY;
+	ctx.bcast_sq.sq_port = QRTR_CTRL_PORT;
+
+	rc = say_hello(&ctx);
 	if (rc)
 		err(1, "unable to say hello");
 
