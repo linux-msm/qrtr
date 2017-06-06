@@ -376,18 +376,17 @@ static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 	}
 	msg = (void *)buf;
 
-	dprintf("new packet; from: %d:%d\n", sq.sq_node, sq.sq_port);
 
 	if (len < 4) {
-		warn("short packet");
+		warnx("short packet from %d:%d", sq.sq_node, sq.sq_port);
 		goto out;
 	}
 
 	cmd = le32_to_cpu(msg->cmd);
 	if (cmd <= _QRTR_CMD_MAX && ctrl_pkt_strings[cmd])
-		dprintf("packet type: %s\n", ctrl_pkt_strings[cmd]);
+		dprintf("%s from %d:%d\n", ctrl_pkt_strings[cmd], sq.sq_node, sq.sq_port);
 	else
-		dprintf("packet type: UNK (%08x)\n", cmd);
+		dprintf("UNK (%08x) from %d:%d\n", cmd, sq.sq_node, sq.sq_port);
 
 	rc = 0;
 	switch (cmd) {
@@ -480,7 +479,7 @@ static void ns_pkt_bye(int sock, struct sockaddr_qrtr *sq_src)
 
 	srv = server_del(sq_src->sq_node, sq_src->sq_port);
 	if (srv == NULL) {
-		warn("bye from to unregistered server");
+		warnx("bye from to unregistered server");
 		return;
 	}
 	cmsg.cmd = cpu_to_le32(QRTR_CMD_DEL_SERVER);
@@ -562,7 +561,7 @@ static void ns_port_fn(void *vcontext, struct waiter_ticket *tkt)
 	dprintf("new packet; from: %d:%d\n", sq.sq_node, sq.sq_port);
 
 	if (len < 4) {
-		warn("short packet");
+		warnx("short packet from %d:%d", sq.sq_node, sq.sq_port);
 		goto out;
 	}
 
