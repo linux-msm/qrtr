@@ -284,6 +284,44 @@ static int ctrl_cmd_bye(struct context *ctx, struct sockaddr_qrtr *sq)
 static int ctrl_cmd_del_client(struct context *ctx, unsigned node_id,
 			       unsigned port)
 {
+	struct qrtr_ctrl_pkt pkt;
+	struct sockaddr_qrtr sq;
+	struct map_entry *me;
+	struct server *srv;
+	struct node *node;
+	int rc;
+
+	srv = server_del(node_id, port);
+	if (srv) {
+		if (srv->node == ctx->local_node)
+			service_announce_del(ctx, &ctx->bcast_sq, srv);
+
+		free(srv);
+	} else {
+		node = node_get(ctx->local_node);
+		if (!node)
+			return 0;
+
+		pkt.cmd = QRTR_CMD_DEL_CLIENT;
+		pkt.client.node = node_id;
+		pkt.client.port = port;
+
+		map_for_each(&node->services, me) {
+			srv = map_iter_data(me, struct server, mi);
+
+			printf("letting %d:%d know about the dying client\n", srv->node, srv->port);
+
+			sq.sq_family = AF_QIPCRTR;
+			sq.sq_node = srv->node;
+			sq.sq_port = srv->port;
+
+			rc = sendto(ctx->ctrl_sock, &pkt, sizeof(pkt), 0,
+				    (struct sockaddr *)&sq, sizeof(sq));
+			if (rc < 0)
+				warn("del_client propagation failed");
+		}
+	}
+
 	return 0;
 }
 
@@ -366,8 +404,8 @@ static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 		rc = ctrl_cmd_bye(ctx, &sq);
 		break;
 	case QRTR_CMD_DEL_CLIENT:
-		rc = ctrl_cmd_del_client(ctx, le32_to_cpu(msg->server.node),
-					 le32_to_cpu(msg->server.port));
+		rc = ctrl_cmd_del_client(ctx, le32_to_cpu(msg->client.node),
+					 le32_to_cpu(msg->client.port));
 		break;
 	case QRTR_CMD_NEW_SERVER:
 		rc = ctrl_cmd_new_server(ctx, &sq,
