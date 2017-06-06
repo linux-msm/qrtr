@@ -80,7 +80,7 @@ $(call add-target-deps,$1)
 
 $1: $(call src_to_obj,$($1-srcs))
 	@echo "LD	$$@"
-	$$(CC) -o $$@ $$(filter %.o,$$^) $(LDFLAGS) -static
+	$$(CC) -o $$@ $$(filter %.o,$$^) $(LDFLAGS)
 
 $(DESTDIR)$(bindir)/$1: $1
 	@echo "INSTALL	$$<"
