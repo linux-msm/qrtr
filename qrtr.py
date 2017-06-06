@@ -16,29 +16,42 @@ class qrtr:
         if self.sock < 0:
             raise RuntimeError("unable to open qrtr socket")
         self.service = None
+        self._qrtr = _qrtr
 
     def __del__(self):
-        if self.service != None:
-            _qrtr.qrtr_bye(self.sock, self.service[0], self.service[1])
-        _qrtr.qrtr_close(self.sock)
+        self._qrtr.qrtr_close(self.sock)
 
     def _lookup_list_add(self, ptr, srv, instance, node, port):
         res = qrtr.Result(srv, instance, (node, port))
         cast(ptr, POINTER(py_object)).contents.value.append(res)
-        
+
     def lookup(self, srv, instance=0, ifilter=0):
         results = []
         err = _qrtr.qrtr_lookup(self.sock, srv, instance, ifilter,
                 qrtr._cbtype(self._lookup_list_add), cast(pointer(py_object(results)), c_void_p))
         if err:
             raise RuntimeError("query failed")
-        return results 
+        return results
 
-    def publish(self, service, instance):
-        err = _qrtr.qrtr_publish(self.sock, service, instance)
+    def publish(self, service, version, instance):
+        err = _qrtr.qrtr_publish(self.sock, service, version, instance)
         if err:
             raise RuntimeError("publish failed")
-        self.service = (service, instance)
+        self.service = (service, version, instance)
+
+    def new_server(self, service, version, instance):
+        err = _qrtr.qrtr_new_server(self.sock, service, version, instance)
+        if err:
+            raise RuntimeError("new_server failed")
+        self.service = (service, version, instance)
+
+        return self.service
+
+    def remove_server(self, service):
+        err = _qrtr.qrtr_remove_server(self.sock, *service)
+        if err:
+            raise RuntimeError("remove_server failed")
+        self.service = None
 
     def send(self, addr, data):
         node, port = addr

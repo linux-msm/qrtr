@@ -13,6 +13,7 @@
 #include "ns.h"
 
 #define LOGW(fmt, ...) do { fprintf(stderr, "W|qrtr: " fmt "\n", ##__VA_ARGS__); } while (0)
+#define LOGE(fmt, ...) do { fprintf(stderr, "E|qrtr: " fmt "\n", ##__VA_ARGS__); } while (0)
 #define LOGE_errno(fmt, ...) do { fprintf(stderr, "E|qrtr: " fmt ": %s\n", ##__VA_ARGS__, strerror(errno)); } while (0)
 
 static int qrtr_getname(int sock, struct sockaddr_qrtr *sq)
@@ -94,6 +95,49 @@ int qrtr_sendto(int sock, uint32_t node, uint32_t port, const void *data, unsign
 	}
 
 	return 0;
+}
+
+int qrtr_new_server(int sock, uint32_t service, uint16_t version, uint16_t instance)
+{
+	struct qrtr_ctrl_pkt pkt;
+	struct sockaddr_qrtr sq;
+
+	if (qrtr_getname(sock, &sq))
+		return -1;
+
+	memset(&pkt, 0, sizeof(pkt));
+
+	if (!sq.sq_port) {
+		LOGE("unable to register server on unbound port");
+		return -1;
+	}
+
+	pkt.cmd = cpu_to_le32(QRTR_CMD_NEW_SERVER);
+	pkt.server.service = cpu_to_le32(service);
+	pkt.server.instance = cpu_to_le32(instance << 16 | version);
+	pkt.server.node = cpu_to_le32(sq.sq_node);
+	pkt.server.port = cpu_to_le32(sq.sq_port);
+
+	return qrtr_sendto(sock, sq.sq_node, QRTR_CTRL_PORT, &pkt, sizeof(pkt));
+}
+
+int qrtr_remove_server(int sock, uint32_t service, uint16_t version, uint16_t instance)
+{
+	struct qrtr_ctrl_pkt pkt;
+	struct sockaddr_qrtr sq;
+
+	if (qrtr_getname(sock, &sq))
+		return -1;
+
+	memset(&pkt, 0, sizeof(pkt));
+
+	pkt.cmd = cpu_to_le32(QRTR_CMD_DEL_SERVER);
+	pkt.server.service = cpu_to_le32(service);
+	pkt.server.instance = cpu_to_le32(instance << 16 | version);
+	pkt.server.node = cpu_to_le32(sq.sq_node);
+	pkt.server.port = cpu_to_le32(sq.sq_port);
+
+	return qrtr_sendto(sock, sq.sq_node, QRTR_CTRL_PORT, &pkt, sizeof(pkt));
 }
 
 int qrtr_publish(int sock, uint32_t service, uint16_t version, uint16_t instance)

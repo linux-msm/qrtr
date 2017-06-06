@@ -165,7 +165,7 @@ static int service_announce_del(struct context *ctx,
 	dprintf("advertising removal of server [%d:%x]@[%d:%d]\n",
 		srv->service, srv->instance, srv->node, srv->port);
 
-	cmsg.cmd = cpu_to_le32(QRTR_CMD_NEW_SERVER);
+	cmsg.cmd = cpu_to_le32(QRTR_CMD_DEL_SERVER);
 	cmsg.server.service = cpu_to_le32(srv->service);
 	cmsg.server.instance = cpu_to_le32(srv->instance);
 	cmsg.server.node = cpu_to_le32(srv->node);
@@ -208,6 +208,9 @@ static struct server *server_add(unsigned int service, unsigned int instance,
 	struct server *srv;
 	struct node *node;
 	int rc;
+
+	if (!service || !port)
+		return NULL;
 
 	srv = calloc(1, sizeof(*srv));
 	if (srv == NULL)
