@@ -245,21 +245,48 @@ int qrtr_handle_ctrl_msg(struct sockaddr_qrtr *sq,
 			 void *data)
 {
 	const struct qrtr_ctrl_pkt *pkt = buf;
+	uint16_t instance;
+	uint32_t service;
+	uint16_t version;
+	uint32_t node;
+	uint32_t port;
+	int cmd;
 
 	if (len < sizeof(__le32))
 		return -EINVAL;
 
-	switch (pkt->cmd) {
-	case QRTR_CMD_BYE:
-		return ops->bye ? ops->bye(sq->sq_node, data) : 0;
-	case QRTR_CMD_DEL_CLIENT:
+	cmd = le32_to_cpu(pkt->cmd);
+
+	if (cmd == QRTR_CMD_BYE && ops->bye) {
+		return ops->bye(sq->sq_node, data);
+	} else if (cmd == QRTR_CMD_DEL_CLIENT && ops->del_client) {
 		if (len < 3 * sizeof(__le32))
 			return -EINVAL;
 
-		return ops->del_client ?
-			ops->del_client(pkt->client.node, pkt->client.port, data) :
-			0;
+		return ops->del_client(pkt->client.node, pkt->client.port, data);
+	} else if (cmd == QRTR_CMD_NEW_SERVER && ops->new_server) {
+		if (len < 5 * sizeof(__le32))
+			return -EINVAL;
+
+		node = le32_to_cpu(pkt->server.node);
+		port = le32_to_cpu(pkt->server.port);
+		service = le32_to_cpu(pkt->server.service);
+		version = le32_to_cpu(pkt->server.instance) & 0xffff;
+		instance = le32_to_cpu(pkt->server.instance) >> 16;
+
+		return ops->new_server(service, version, instance, node, port, data);
+	} else if (cmd == QRTR_CMD_DEL_SERVER && ops->del_server) {
+		if (len < 5 * sizeof(__le32))
+			return -EINVAL;
+
+		node = le32_to_cpu(pkt->server.node);
+		port = le32_to_cpu(pkt->server.port);
+		service = le32_to_cpu(pkt->server.service);
+		version = le32_to_cpu(pkt->server.instance) & 0xffff;
+		instance = le32_to_cpu(pkt->server.instance) >> 16;
+
+		return ops->del_server(service, version, instance, node, port, data);
 	}
 
-	return -EINVAL;
+	return 0;
 }

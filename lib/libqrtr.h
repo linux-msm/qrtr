@@ -8,6 +8,10 @@ struct sockaddr_qrtr;
 struct qrtr_ind_ops {
 	int (*bye)(uint32_t node, void *data);
 	int (*del_client)(uint32_t node, uint32_t port, void *data);
+	int (*new_server)(uint32_t service, uint16_t version, uint16_t instance,
+			  uint32_t node, uint32_t port, void *data);
+	int (*del_server)(uint32_t service, uint16_t version, uint16_t instance,
+			  uint32_t node, uint32_t port, void *data);
 };
 
 int qrtr_open(int rport);
