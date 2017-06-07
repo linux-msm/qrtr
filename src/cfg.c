@@ -1,4 +1,5 @@
 #include <err.h>
+#include <errno.h>
 #include <limits.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
@@ -25,6 +26,10 @@ int main(int argc, char **argv)
 		struct ifaddrmsg ifa;
 		char attrbuf[32];
 	} req;
+	struct {
+		struct nlmsghdr nh;
+		struct nlmsgerr err;
+	} resp;
 	struct rtattr *rta;
 	unsigned long addrul;
 	uint32_t addr;
@@ -46,7 +51,7 @@ int main(int argc, char **argv)
 
 	memset(&req, 0, sizeof(req));
 	req.nh.nlmsg_len = NLMSG_SPACE(sizeof(struct ifaddrmsg));
-	req.nh.nlmsg_flags = NLM_F_REQUEST;
+	req.nh.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
 	req.nh.nlmsg_type = RTM_NEWADDR;
 	req.ifa.ifa_family = AF_QIPCRTR;
 
@@ -60,6 +65,15 @@ int main(int argc, char **argv)
 	ret = send(sock, &req, req.nh.nlmsg_len, 0);
 	if (ret < 0)
 		err(1, "failed to send netlink request");
+
+	ret = recv(sock, &resp, sizeof(resp), 0);
+	if (ret < 0)
+		err(1, "failed to receive netlink response");
+
+	if (resp.nh.nlmsg_type == NLMSG_ERROR && resp.err.error != 0) {
+		errno = -resp.err.error;
+		err(1, "failed to configure node id");
+	}
 
 	return 0;
 }
