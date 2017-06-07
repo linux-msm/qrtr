@@ -64,6 +64,8 @@ struct node {
 
 static struct map nodes;
 
+static void server_mi_free(struct map_item *mi);
+
 static struct node *node_get(unsigned int node_id)
 {
 	struct map_item *mi;
@@ -276,8 +278,41 @@ static int ctrl_cmd_hello(struct context *ctx, struct sockaddr_qrtr *sq,
 	return rc;
 }
 
-static int ctrl_cmd_bye(struct context *ctx, struct sockaddr_qrtr *sq)
+static int ctrl_cmd_bye(struct context *ctx, struct sockaddr_qrtr *from)
 {
+	struct qrtr_ctrl_pkt pkt;
+	struct sockaddr_qrtr sq;
+	struct map_entry *me;
+	struct server *srv;
+	struct node *node;
+	int rc;
+
+	node = node_get(from->sq_node);
+	if (!node)
+		return 0;
+
+	map_clear(&node->services, server_mi_free);
+
+	/* Advertise the removal of this client to all local services */
+	node = node_get(ctx->local_node);
+	if (!node)
+		return 0;
+
+	pkt.cmd = QRTR_CMD_BYE;
+
+	map_for_each(&node->services, me) {
+		srv = map_iter_data(me, struct server, mi);
+
+		sq.sq_family = AF_QIPCRTR;
+		sq.sq_node = srv->node;
+		sq.sq_port = srv->port;
+
+		rc = sendto(ctx->ctrl_sock, &pkt, sizeof(pkt), 0,
+				(struct sockaddr *)&sq, sizeof(sq));
+		if (rc < 0)
+			warn("bye propagation failed");
+	}
+
 	return 0;
 }
 
