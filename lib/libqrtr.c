@@ -142,36 +142,12 @@ int qrtr_remove_server(int sock, uint32_t service, uint16_t version, uint16_t in
 
 int qrtr_publish(int sock, uint32_t service, uint16_t version, uint16_t instance)
 {
-	struct sockaddr_qrtr sq;
-	struct ns_pkt pkt;
-
-	if (qrtr_getname(sock, &sq))
-		return -1;
-
-	memset(&pkt, 0, sizeof(pkt));
-
-	pkt.type = cpu_to_le32(NS_PKT_PUBLISH);
-	pkt.publish.service = cpu_to_le32(service);
-	pkt.publish.instance = cpu_to_le32(instance << 16 | version);
-
-	return qrtr_sendto(sock, sq.sq_node, NS_PORT, &pkt, sizeof(pkt));
+	return qrtr_new_server(sock, service, version, instance);
 }
 
 int qrtr_bye(int sock, uint32_t service, uint16_t version, uint16_t instance)
 {
-	struct sockaddr_qrtr sq;
-	struct ns_pkt pkt;
-
-	if (qrtr_getname(sock, &sq))
-		return -1;
-
-	memset(&pkt, 0, sizeof(pkt));
-
-	pkt.type = cpu_to_le32(NS_PKT_BYE);
-	pkt.bye.service = cpu_to_le32(service);
-	pkt.bye.instance = cpu_to_le32(instance << 16 | version);
-
-	return qrtr_sendto(sock, sq.sq_node, NS_PORT, &pkt, sizeof(pkt));
+	return qrtr_remove_server(sock, service, version, instance);
 }
 
 int qrtr_poll(int sock, unsigned int ms)
