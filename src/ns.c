@@ -612,36 +612,6 @@ static int say_hello(struct context *ctx)
 	return 0;
 }
 
-static int qrtr_socket(int port)
-{
-	struct sockaddr_qrtr sq;
-	socklen_t sl = sizeof(sq);
-	int sock;
-	int rc;
-
-	sock = socket(AF_QIPCRTR, SOCK_DGRAM, 0);
-	if (sock < 0) {
-		warn("sock(AF_QIPCRTR)");
-		return -1;
-	}
-
-	rc = getsockname(sock, (void*)&sq, &sl);
-	if (rc < 0 || sq.sq_node == -1) {
-		warn("getsockname()");
-		return -1;
-	}
-	sq.sq_port = port;
-
-	rc = bind(sock, (void *)&sq, sizeof(sq));
-	if (rc < 0) {
-		warn("bind(sock)");
-		close(sock);
-		return -1;
-	}
-
-	return sock;
-}
-
 static void server_mi_free(struct map_item *mi)
 {
 	free(container_of(mi, struct server, mi));
@@ -676,15 +646,19 @@ int main(int argc, char **argv)
 	if (rc)
 		errx(1, "unable to create node map");
 
-	ctx.sock = qrtr_socket(QRTR_CTRL_PORT);
+	ctx.sock = socket(AF_QIPCRTR, SOCK_DGRAM, 0);
 	if (ctx.sock < 0)
-		errx(1, "unable to create control socket");
+		err(1, "unable to create control socket");
 
 	rc = getsockname(ctx.sock, (void*)&sq, &sl);
 	if (rc < 0)
 		err(1, "getsockname()");
-
+	sq.sq_port = QRTR_CTRL_PORT;
 	ctx.local_node = sq.sq_node;
+
+	rc = bind(ctx.sock, (void *)&sq, sizeof(sq));
+	if (rc < 0)
+		err(1, "bind control socket");
 
 	ctx.bcast_sq.sq_family = AF_QIPCRTR;
 	ctx.bcast_sq.sq_node = QRTRADDR_ANY;
