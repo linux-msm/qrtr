@@ -81,9 +81,9 @@ static unsigned int read_num_le(const char *str, int *rcp)
 
 int main(int argc, char **argv)
 {
+	struct qrtr_ctrl_pkt pkt;
 	struct sockaddr_qrtr sq;
 	socklen_t sl = sizeof(sq);
-	struct ns_pkt pkt;
 	struct timeval tv;
 	int sock;
 	int len;
@@ -96,9 +96,8 @@ int main(int argc, char **argv)
 	default:
 		rc = -1;
 		break;
-	case 4: pkt.query.ifilter = read_num_le(argv[3], &rc);
-	case 3: pkt.query.instance = read_num_le(argv[2], &rc);
-	case 2: pkt.query.service = read_num_le(argv[1], &rc);
+	case 3: pkt.server.instance = read_num_le(argv[2], &rc);
+	case 2: pkt.server.service = read_num_le(argv[1], &rc);
 	case 1: break;
 	}
 	if (rc)
@@ -112,12 +111,12 @@ int main(int argc, char **argv)
 	if (rc || sq.sq_family != AF_QIPCRTR || sl != sizeof(sq))
 		err(1, "getsockname()");
 
-	sq.sq_port = NS_PORT;
+	sq.sq_port = QRTR_CTRL_PORT;
 
 	tv.tv_sec = 1;
 	tv.tv_usec = 0;
 
-	pkt.type = cpu_to_le32(NS_PKT_QUERY);
+	pkt.cmd = cpu_to_le32(QRTR_CMD_NEW_LOOKUP);
 
 	rc = setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 	if (rc)
@@ -130,40 +129,41 @@ int main(int argc, char **argv)
 	printf("  Service Node  Port\n");
 
 	while ((len = recv(sock, &pkt, sizeof(pkt), 0)) > 0) {
-		unsigned int type = le32_to_cpu(pkt.type);
+		unsigned int type = le32_to_cpu(pkt.cmd);
 		const char *name = NULL;
 		unsigned int i;
 		char srv_buf[32];
 
-		if (len < sizeof(pkt) || type != NS_PKT_NOTICE) {
+		if (len < sizeof(pkt) || type != QRTR_CMD_LOOKUP_RESULT) {
 			warn("invalid/short packet");
 			continue;
 		}
 
-		if (pkt.notice.seq == 0)
+		if (!pkt.server.service && !pkt.server.instance &&
+		    !pkt.server.node && !pkt.server.port)
 			break;
 
-		pkt.notice.service = le32_to_cpu(pkt.notice.service);
-		pkt.notice.instance = le32_to_cpu(pkt.notice.instance);
-		pkt.notice.node = le32_to_cpu(pkt.notice.node);
-		pkt.notice.port = le32_to_cpu(pkt.notice.port);
+		pkt.server.service = le32_to_cpu(pkt.server.service);
+		pkt.server.instance = le32_to_cpu(pkt.server.instance);
+		pkt.server.node = le32_to_cpu(pkt.server.node);
+		pkt.server.port = le32_to_cpu(pkt.server.port);
 
 		for (i = 0; i < sizeof(common_names)/sizeof(common_names[0]); ++i) {
-			if (pkt.notice.service != common_names[i].service)
+			if (pkt.server.service != common_names[i].service)
 				continue;
-			if (pkt.notice.instance &&
-			   (pkt.notice.instance & common_names[i].ifilter) != common_names[i].ifilter)
+			if (pkt.server.instance &&
+			   (pkt.server.instance & common_names[i].ifilter) != common_names[i].ifilter)
 				continue;
 			name = common_names[i].name;
 		}
 
 		snprintf(srv_buf, sizeof(srv_buf), "%d:%d",
-			 pkt.notice.service, pkt.notice.instance);
+			 pkt.server.service, pkt.server.instance);
 
 		printf("%9s %4d %5d (%s)\n",
 				srv_buf,
-				pkt.notice.node,
-				pkt.notice.port,
+				pkt.server.node,
+				pkt.server.port,
 				name ? name : "<unknown>");
 	}
 
