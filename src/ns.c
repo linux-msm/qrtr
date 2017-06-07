@@ -34,7 +34,7 @@ static const char *ctrl_pkt_strings[] = {
 #define ARRAY_SIZE(x) (sizeof(x)/sizeof((x)[0]))
 
 struct context {
-	int ctrl_sock;
+	int sock;
 
 	int local_node;
 
@@ -161,7 +161,7 @@ static int service_announce_new(struct context *ctx,
 	cmsg.server.node = cpu_to_le32(srv->node);
 	cmsg.server.port = cpu_to_le32(srv->port);
 
-	rc = sendto(ctx->ctrl_sock, &cmsg, sizeof(cmsg), 0,
+	rc = sendto(ctx->sock, &cmsg, sizeof(cmsg), 0,
 		    (struct sockaddr *)dest, sizeof(*dest));
 	if (rc < 0)
 		warn("sendto()");
@@ -185,7 +185,7 @@ static int service_announce_del(struct context *ctx,
 	cmsg.server.node = cpu_to_le32(srv->node);
 	cmsg.server.port = cpu_to_le32(srv->port);
 
-	rc = sendto(ctx->ctrl_sock, &cmsg, sizeof(cmsg), 0,
+	rc = sendto(ctx->sock, &cmsg, sizeof(cmsg), 0,
 		    (struct sockaddr *)dest, sizeof(*dest));
 	if (rc < 0)
 		warn("sendto()");
@@ -292,7 +292,7 @@ static int lookup_notify(struct context *ctx, struct sockaddr_qrtr *to,
 		pkt.server.port = cpu_to_le32(srv->port);
 	}
 
-	rc = sendto(ctx->ctrl_sock, &pkt, sizeof(pkt), 0,
+	rc = sendto(ctx->sock, &pkt, sizeof(pkt), 0,
 		    (struct sockaddr *)to, sizeof(*to));
 	if (rc < 0)
 		warn("send lookup result failed");
@@ -304,7 +304,7 @@ static int ctrl_cmd_hello(struct context *ctx, struct sockaddr_qrtr *sq,
 {
 	int rc;
 
-	rc = sendto(ctx->ctrl_sock, buf, len, 0, (void *)sq, sizeof(*sq));
+	rc = sendto(ctx->sock, buf, len, 0, (void *)sq, sizeof(*sq));
 	if (rc > 0)
 		rc = annouce_servers(ctx, sq);
 
@@ -340,7 +340,7 @@ static int ctrl_cmd_bye(struct context *ctx, struct sockaddr_qrtr *from)
 		sq.sq_node = srv->node;
 		sq.sq_port = srv->port;
 
-		rc = sendto(ctx->ctrl_sock, &pkt, sizeof(pkt), 0,
+		rc = sendto(ctx->sock, &pkt, sizeof(pkt), 0,
 				(struct sockaddr *)&sq, sizeof(sq));
 		if (rc < 0)
 			warn("bye propagation failed");
@@ -399,7 +399,7 @@ static int ctrl_cmd_del_client(struct context *ctx, unsigned node_id,
 		sq.sq_node = srv->node;
 		sq.sq_port = srv->port;
 
-		rc = sendto(ctx->ctrl_sock, &pkt, sizeof(pkt), 0,
+		rc = sendto(ctx->sock, &pkt, sizeof(pkt), 0,
 				(struct sockaddr *)&sq, sizeof(sq));
 		if (rc < 0)
 			warn("del_client propagation failed");
@@ -519,7 +519,7 @@ static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 {
 	struct context *ctx = vcontext;
 	struct sockaddr_qrtr sq;
-	int sock = ctx->ctrl_sock;
+	int sock = ctx->sock;
 	struct qrtr_ctrl_pkt *msg;
 	unsigned int cmd;
 	char buf[4096];
@@ -532,7 +532,7 @@ static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 	if (len <= 0) {
 		warn("recvfrom()");
 		close(sock);
-		ctx->ctrl_sock = -1;
+		ctx->sock = -1;
 		goto out;
 	}
 	msg = (void *)buf;
@@ -604,7 +604,7 @@ static int say_hello(struct context *ctx)
 	memset(&pkt, 0, sizeof(pkt));
 	pkt.cmd = cpu_to_le32(QRTR_CMD_HELLO);
 
-	rc = sendto(ctx->ctrl_sock, &pkt, sizeof(pkt), 0,
+	rc = sendto(ctx->sock, &pkt, sizeof(pkt), 0,
 		    (struct sockaddr *)&ctx->bcast_sq, sizeof(ctx->bcast_sq));
 	if (rc < 0)
 		return rc;
@@ -676,11 +676,11 @@ int main(int argc, char **argv)
 	if (rc)
 		errx(1, "unable to create node map");
 
-	ctx.ctrl_sock = qrtr_socket(QRTR_CTRL_PORT);
-	if (ctx.ctrl_sock < 0)
+	ctx.sock = qrtr_socket(QRTR_CTRL_PORT);
+	if (ctx.sock < 0)
 		errx(1, "unable to create control socket");
 
-	rc = getsockname(ctx.ctrl_sock, (void*)&sq, &sl);
+	rc = getsockname(ctx.sock, (void*)&sq, &sl);
 	if (rc < 0)
 		err(1, "getsockname()");
 
@@ -695,14 +695,14 @@ int main(int argc, char **argv)
 		err(1, "unable to say hello");
 
 	if (fork() != 0) {
-		close(ctx.ctrl_sock);
+		close(ctx.sock);
 		exit(0);
 	}
 
-	tkt = waiter_add_fd(w, ctx.ctrl_sock);
+	tkt = waiter_add_fd(w, ctx.sock);
 	waiter_ticket_callback(tkt, ctrl_port_fn, &ctx);
 
-	while (ctx.ctrl_sock >= 0)
+	while (ctx.sock >= 0)
 		waiter_wait(w);
 
 	puts("exiting cleanly");
