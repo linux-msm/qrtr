@@ -35,7 +35,6 @@ static const char *ctrl_pkt_strings[] = {
 
 struct context {
 	int ctrl_sock;
-	int ns_sock;
 
 	int local_node;
 
@@ -613,154 +612,6 @@ static int say_hello(struct context *ctx)
 	return 0;
 }
 
-static void ns_pkt_publish(int sock, struct sockaddr_qrtr *sq_src,
-			   unsigned int service, unsigned int instance)
-{
-	struct qrtr_ctrl_pkt cmsg;
-	struct sockaddr_qrtr sq;
-	struct server *srv;
-	int rc;
-
-	srv = server_add(service, instance, sq_src->sq_node, sq_src->sq_port);
-	if (srv == NULL) {
-		warn("unable to add server");
-		return;
-	}
-
-	cmsg.cmd = cpu_to_le32(QRTR_CMD_NEW_SERVER);
-	cmsg.server.service = cpu_to_le32(srv->service);
-	cmsg.server.instance = cpu_to_le32(srv->instance);
-	cmsg.server.node = cpu_to_le32(srv->node);
-	cmsg.server.port = cpu_to_le32(srv->port);
-
-	sq.sq_family = AF_QIPCRTR;
-	sq.sq_node = QRTRADDR_ANY;
-	sq.sq_port = QRTR_CTRL_PORT;
-
-	rc = sendto(sock, &cmsg, sizeof(cmsg), 0, (void *)&sq, sizeof(sq));
-	if (rc < 0)
-		warn("sendto()");
-}
-
-static void ns_pkt_bye(int sock, struct sockaddr_qrtr *sq_src)
-{
-	struct qrtr_ctrl_pkt cmsg;
-	struct sockaddr_qrtr sq;
-	struct server *srv;
-	int rc;
-
-	srv = server_del(sq_src->sq_node, sq_src->sq_port);
-	if (srv == NULL) {
-		warnx("bye from to unregistered server");
-		return;
-	}
-	cmsg.cmd = cpu_to_le32(QRTR_CMD_DEL_SERVER);
-	cmsg.server.service = cpu_to_le32(srv->service);
-	cmsg.server.instance = cpu_to_le32(srv->instance);
-	cmsg.server.node = cpu_to_le32(srv->node);
-	cmsg.server.port = cpu_to_le32(srv->port);
-	free(srv);
-
-	sq.sq_family = AF_QIPCRTR;
-	sq.sq_node = QRTRADDR_ANY;
-	sq.sq_port = QRTR_CTRL_PORT;
-
-	rc = sendto(sock, &cmsg, sizeof(cmsg), 0, (void *)&sq, sizeof(sq));
-	if (rc < 0)
-		warn("sendto()");
-}
-
-static void ns_pkt_query(int sock, struct sockaddr_qrtr *sq,
-			 struct server_filter *filter)
-{
-	struct list reply_list;
-	struct list_item *li;
-	struct ns_pkt opkt;
-	int seq;
-	int rc;
-
-	seq = server_query(filter, &reply_list);
-
-	memset(&opkt, 0, sizeof(opkt));
-	opkt.type = NS_PKT_NOTICE;
-	list_for_each(&reply_list, li) {
-		struct server *srv = container_of(li, struct server, qli);
-
-		opkt.notice.seq = cpu_to_le32(seq);
-		opkt.notice.service = cpu_to_le32(srv->service);
-		opkt.notice.instance = cpu_to_le32(srv->instance);
-		opkt.notice.node = cpu_to_le32(srv->node);
-		opkt.notice.port = cpu_to_le32(srv->port);
-		rc = sendto(sock, &opkt, sizeof(opkt),
-				0, (void *)sq, sizeof(*sq));
-		if (rc < 0) {
-			warn("sendto()");
-			break;
-		}
-		--seq;
-	}
-	if (rc < 0)
-		return;
-
-	memset(&opkt, 0, sizeof(opkt));
-	opkt.type = NS_PKT_NOTICE;
-	rc = sendto(sock, &opkt, sizeof(opkt), 0, (void *)sq, sizeof(*sq));
-	if (rc < 0)
-		warn("sendto()");
-}
-
-static void ns_port_fn(void *vcontext, struct waiter_ticket *tkt)
-{
-	struct context *ctx = vcontext;
-	struct server_filter filter;
-	struct sockaddr_qrtr sq;
-	int sock = ctx->ns_sock;
-	struct ns_pkt *msg;
-	char buf[4096];
-	socklen_t sl;
-	ssize_t len;
-
-	sl = sizeof(sq);
-	len = recvfrom(sock, buf, sizeof(buf), 0, (void *)&sq, &sl);
-	if (len <= 0) {
-		warn("recvfrom()");
-		close(sock);
-		ctx->ns_sock = -1;
-		goto out;
-	}
-	msg = (void *)buf;
-
-	dprintf("new packet; from: %d:%d\n", sq.sq_node, sq.sq_port);
-
-	if (len < 4) {
-		warnx("short packet from %d:%d", sq.sq_node, sq.sq_port);
-		goto out;
-	}
-
-	switch (le32_to_cpu(msg->type)) {
-	case NS_PKT_PUBLISH:
-		ns_pkt_publish(ctx->ctrl_sock, &sq,
-			       le32_to_cpu(msg->publish.service),
-			       le32_to_cpu(msg->publish.instance));
-		break;
-	case NS_PKT_BYE:
-		ns_pkt_bye(ctx->ctrl_sock, &sq);
-		break;
-	case NS_PKT_QUERY:
-		filter.service = le32_to_cpu(msg->query.service);
-		filter.instance = le32_to_cpu(msg->query.instance);
-		filter.ifilter = le32_to_cpu(msg->query.ifilter);
-
-		ns_pkt_query(sock, &sq, &filter);
-		break;
-	case NS_PKT_NOTICE:
-		break;
-	}
-
-out:
-	waiter_ticket_clear(tkt);
-}
-
 static int qrtr_socket(int port)
 {
 	struct sockaddr_qrtr sq;
@@ -829,10 +680,6 @@ int main(int argc, char **argv)
 	if (ctx.ctrl_sock < 0)
 		errx(1, "unable to create control socket");
 
-	ctx.ns_sock = qrtr_socket(NS_PORT);
-	if (ctx.ns_sock < 0)
-		errx(1, "unable to create nameserver socket");
-
 	rc = getsockname(ctx.ctrl_sock, (void*)&sq, &sl);
 	if (rc < 0)
 		err(1, "getsockname()");
@@ -849,17 +696,13 @@ int main(int argc, char **argv)
 
 	if (fork() != 0) {
 		close(ctx.ctrl_sock);
-		close(ctx.ns_sock);
 		exit(0);
 	}
 
 	tkt = waiter_add_fd(w, ctx.ctrl_sock);
 	waiter_ticket_callback(tkt, ctrl_port_fn, &ctx);
 
-	tkt = waiter_add_fd(w, ctx.ns_sock);
-	waiter_ticket_callback(tkt, ns_port_fn, &ctx);
-
-	while (ctx.ctrl_sock >= 0 && ctx.ns_sock >= 0)
+	while (ctx.ctrl_sock >= 0)
 		waiter_wait(w);
 
 	puts("exiting cleanly");
