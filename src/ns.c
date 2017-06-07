@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -279,12 +280,12 @@ static struct server *server_del(unsigned int node_id, unsigned int port)
 }
 
 static int lookup_notify(struct context *ctx, struct sockaddr_qrtr *to,
-			 struct server *srv)
+			 struct server *srv, bool new)
 {
 	struct qrtr_ctrl_pkt pkt = {};
 	int rc;
 
-	pkt.cmd = QRTR_CMD_LOOKUP_RESULT;
+	pkt.cmd = new ? QRTR_CMD_NEW_SERVER : QRTR_CMD_DEL_SERVER;
 	if (srv) {
 		pkt.server.service = cpu_to_le32(srv->service);
 		pkt.server.instance = cpu_to_le32(srv->instance);
@@ -431,7 +432,7 @@ static int ctrl_cmd_new_server(struct context *ctx, struct sockaddr_qrtr *from,
 		if (lookup->instance && lookup->instance != instance)
 			continue;
 
-		lookup_notify(ctx, &lookup->sq, srv);
+		lookup_notify(ctx, &lookup->sq, srv, true);
 	}
 
 	return rc;
@@ -441,6 +442,8 @@ static int ctrl_cmd_del_server(struct context *ctx, unsigned int service,
 			       unsigned int instance, unsigned int node_id,
 			       unsigned int port)
 {
+	struct lookup *lookup;
+	struct list_item *li;
 	struct server *srv;
 	int rc = 0;
 
@@ -450,6 +453,16 @@ static int ctrl_cmd_del_server(struct context *ctx, unsigned int service,
 
 	if (srv->node == ctx->local_node)
 		rc = service_announce_del(ctx, &ctx->bcast_sq, srv);
+
+	list_for_each(&ctx->lookups, li) {
+		lookup = container_of(li, struct lookup, li);
+		if (lookup->service && lookup->service != service)
+			continue;
+		if (lookup->instance && lookup->instance != instance)
+			continue;
+
+		lookup_notify(ctx, &lookup->sq, srv, false);
+	}
 
 	free(srv);
 
@@ -482,10 +495,10 @@ static int ctrl_cmd_new_lookup(struct context *ctx, struct sockaddr_qrtr *from,
 	list_for_each(&reply_list, li) {
 		srv = container_of(li, struct server, qli);
 
-		lookup_notify(ctx, from, srv);
+		lookup_notify(ctx, from, srv, true);
 	}
 
-	lookup_notify(ctx, from, NULL);
+	lookup_notify(ctx, from, NULL, true);
 
 	return 0;
 }

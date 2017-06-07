@@ -134,7 +134,7 @@ int main(int argc, char **argv)
 		unsigned int i;
 		char srv_buf[32];
 
-		if (len < sizeof(pkt) || type != QRTR_CMD_LOOKUP_RESULT) {
+		if (len < sizeof(pkt) || type != QRTR_CMD_NEW_SERVER) {
 			warn("invalid/short packet");
 			continue;
 		}

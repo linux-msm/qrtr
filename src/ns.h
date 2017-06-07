@@ -27,7 +27,6 @@ enum ctrl_pkt_cmd {
 	QRTR_CMD_PING		= 9,
 	QRTR_CMD_NEW_LOOKUP	= 10,
 	QRTR_CMD_DEL_LOOKUP	= 11,
-	QRTR_CMD_LOOKUP_RESULT	= 12,
 };
 
 struct qrtr_ctrl_pkt {
