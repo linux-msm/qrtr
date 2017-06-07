@@ -232,3 +232,34 @@ int qrtr_recvfrom(int sock, void *buf, unsigned int bsz, uint32_t *node, uint32_
 		*port = sq.sq_port;
 	return rc;
 }
+
+int qrtr_is_ctrl_addr(struct sockaddr_qrtr *sq)
+{
+	return sq->sq_port == QRTR_CTRL_PORT;
+}
+
+int qrtr_handle_ctrl_msg(struct sockaddr_qrtr *sq,
+			 const void *buf,
+			 size_t len,
+			 struct qrtr_ind_ops *ops,
+			 void *data)
+{
+	const struct qrtr_ctrl_pkt *pkt = buf;
+
+	if (len < sizeof(__le32))
+		return -EINVAL;
+
+	switch (pkt->cmd) {
+	case QRTR_CMD_BYE:
+		return ops->bye ? ops->bye(sq->sq_node, data) : 0;
+	case QRTR_CMD_DEL_CLIENT:
+		if (len < 3 * sizeof(__le32))
+			return -EINVAL;
+
+		return ops->del_client ?
+			ops->del_client(pkt->client.node, pkt->client.port, data) :
+			0;
+	}
+
+	return -EINVAL;
+}

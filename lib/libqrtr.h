@@ -3,6 +3,13 @@
 
 #include <stdint.h>
 
+struct sockaddr_qrtr;
+
+struct qrtr_ind_ops {
+	int (*bye)(uint32_t node, void *data);
+	int (*del_client)(uint32_t node, uint32_t port, void *data);
+};
+
 int qrtr_open(int rport);
 void qrtr_close(int sock);
 
@@ -22,5 +29,12 @@ int qrtr_remove_lookup(int sock, uint32_t service, uint16_t version, uint16_t in
 int qrtr_poll(int sock, unsigned int ms);
 int qrtr_lookup(int sock, uint32_t service, uint16_t version, uint16_t instance, uint32_t ifilter,
 		void (* cb)(void *,uint32_t,uint32_t,uint32_t,uint32_t), void *udata);
+
+int qrtr_is_ctrl_addr(struct sockaddr_qrtr *sq);
+int qrtr_handle_ctrl_msg(struct sockaddr_qrtr *sq,
+			 const void *buf,
+			 size_t len,
+			 struct qrtr_ind_ops *ops,
+			 void *data);
 
 #endif
