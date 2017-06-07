@@ -53,6 +53,17 @@ class qrtr:
             raise RuntimeError("remove_server failed")
         self.service = None
 
+    def new_lookup(self, service, version, instance):
+        err = _qrtr.qrtr_new_lookup(self.sock, service, version, instance)
+        if err:
+            raise RuntimeError("new_lookup failed")
+        return (service, version, instance)
+
+    def remove_lookup(self, lookup):
+        err = _qrtr.qrtr_remove_lookup(self.sock, *lookup)
+        if err:
+            raise RuntimeError("remove_lookup failed")
+
     def send(self, addr, data):
         node, port = addr
         n = _qrtr.qrtr_sendto(self.sock, node, port, c_char_p(data), len(data))

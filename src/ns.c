@@ -26,9 +26,12 @@ static const char *ctrl_pkt_strings[] = {
 	[QRTR_CMD_RESUME_TX]	= "resume-tx",
 	[QRTR_CMD_EXIT]		= "exit",
 	[QRTR_CMD_PING]		= "ping",
+	[QRTR_CMD_NEW_LOOKUP]	= "new-lookup",
+	[QRTR_CMD_DEL_LOOKUP]	= "del-lookup",
 };
 
 #define dprintf(...)
+#define ARRAY_SIZE(x) (sizeof(x)/sizeof((x)[0]))
 
 struct context {
 	int ctrl_sock;
@@ -37,12 +40,22 @@ struct context {
 	int local_node;
 
 	struct sockaddr_qrtr bcast_sq;
+
+	struct list lookups;
 };
 
 struct server_filter {
 	unsigned int service;
 	unsigned int instance;
 	unsigned int ifilter;
+};
+
+struct lookup {
+	unsigned int service;
+	unsigned int instance;
+
+	struct sockaddr_qrtr sq;
+	struct list_item li;
 };
 
 struct server {
@@ -266,6 +279,27 @@ static struct server *server_del(unsigned int node_id, unsigned int port)
 	return srv;
 }
 
+static int lookup_notify(struct context *ctx, struct sockaddr_qrtr *to,
+			 struct server *srv)
+{
+	struct qrtr_ctrl_pkt pkt = {};
+	int rc;
+
+	pkt.cmd = QRTR_CMD_LOOKUP_RESULT;
+	if (srv) {
+		pkt.server.service = cpu_to_le32(srv->service);
+		pkt.server.instance = cpu_to_le32(srv->instance);
+		pkt.server.node = cpu_to_le32(srv->node);
+		pkt.server.port = cpu_to_le32(srv->port);
+	}
+
+	rc = sendto(ctx->ctrl_sock, &pkt, sizeof(pkt), 0,
+		    (struct sockaddr *)to, sizeof(*to));
+	if (rc < 0)
+		warn("send lookup result failed");
+	return rc;
+}
+
 static int ctrl_cmd_hello(struct context *ctx, struct sockaddr_qrtr *sq,
 			  const void *buf, size_t len)
 {
@@ -321,10 +355,25 @@ static int ctrl_cmd_del_client(struct context *ctx, unsigned node_id,
 {
 	struct qrtr_ctrl_pkt pkt;
 	struct sockaddr_qrtr sq;
+	struct list_item *tmp;
+	struct lookup *lookup;
+	struct list_item *li;
 	struct map_entry *me;
 	struct server *srv;
 	struct node *node;
 	int rc;
+
+	/* Remove any lookups for this client */
+	list_for_each_safe(&ctx->lookups, li, tmp) {
+		lookup = container_of(li, struct lookup, li);
+		if (lookup->sq.sq_node != node_id)
+			continue;
+		if (lookup->sq.sq_port != port)
+			continue;
+
+		list_remove(&ctx->lookups, &lookup->li);
+		free(lookup);
+	}
 
 	/* Remove the server belonging to this port*/
 	srv = server_del(node_id, port);
@@ -364,6 +413,8 @@ static int ctrl_cmd_new_server(struct context *ctx, struct sockaddr_qrtr *from,
 			       unsigned int service, unsigned int instance,
 			       unsigned int node_id, unsigned int port)
 {
+	struct lookup *lookup;
+	struct list_item *li;
 	struct server *srv;
 	int rc = 0;
 
@@ -373,6 +424,16 @@ static int ctrl_cmd_new_server(struct context *ctx, struct sockaddr_qrtr *from,
 
 	if (srv->node == ctx->local_node)
 		rc = service_announce_new(ctx, &ctx->bcast_sq, srv);
+
+	list_for_each(&ctx->lookups, li) {
+		lookup = container_of(li, struct lookup, li);
+		if (lookup->service && lookup->service != service)
+			continue;
+		if (lookup->instance && lookup->instance != instance)
+			continue;
+
+		lookup_notify(ctx, &lookup->sq, srv);
+	}
 
 	return rc;
 }
@@ -394,6 +455,65 @@ static int ctrl_cmd_del_server(struct context *ctx, unsigned int service,
 	free(srv);
 
 	return rc;
+}
+
+static int ctrl_cmd_new_lookup(struct context *ctx, struct sockaddr_qrtr *from,
+			       unsigned int service, unsigned int instance)
+{
+	struct server_filter filter;
+	struct list reply_list;
+	struct lookup *lookup;
+	struct list_item *li;
+	struct server *srv;
+
+	lookup = calloc(1, sizeof(*lookup));
+	if (!lookup)
+		return -EINVAL;
+
+	lookup->sq = *from;
+	lookup->service = service;
+	lookup->instance = instance;
+	list_append(&ctx->lookups, &lookup->li);
+
+	memset(&filter, 0, sizeof(filter));
+	filter.service = service;
+	filter.instance = instance;
+
+	server_query(&filter, &reply_list);
+	list_for_each(&reply_list, li) {
+		srv = container_of(li, struct server, qli);
+
+		lookup_notify(ctx, from, srv);
+	}
+
+	lookup_notify(ctx, from, NULL);
+
+	return 0;
+}
+
+static int ctrl_cmd_del_lookup(struct context *ctx, struct sockaddr_qrtr *from,
+			       unsigned int service, unsigned int instance)
+{
+	struct lookup *lookup;
+	struct list_item *tmp;
+	struct list_item *li;
+
+	list_for_each_safe(&ctx->lookups, li, tmp) {
+		lookup = container_of(li, struct lookup, li);
+		if (lookup->sq.sq_node != from->sq_node)
+			continue;
+		if (lookup->sq.sq_port != from->sq_port)
+			continue;
+		if (lookup->service != service)
+			continue;
+		if (lookup->instance && lookup->instance != instance)
+			continue;
+
+		list_remove(&ctx->lookups, &lookup->li);
+		free(lookup);
+	}
+
+	return 0;
 }
 
 static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
@@ -418,14 +538,13 @@ static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 	}
 	msg = (void *)buf;
 
-
 	if (len < 4) {
 		warnx("short packet from %d:%d", sq.sq_node, sq.sq_port);
 		goto out;
 	}
 
 	cmd = le32_to_cpu(msg->cmd);
-	if (cmd <= _QRTR_CMD_MAX && ctrl_pkt_strings[cmd])
+	if (cmd < ARRAY_SIZE(ctrl_pkt_strings) && ctrl_pkt_strings[cmd])
 		dprintf("%s from %d:%d\n", ctrl_pkt_strings[cmd], sq.sq_node, sq.sq_port);
 	else
 		dprintf("UNK (%08x) from %d:%d\n", cmd, sq.sq_node, sq.sq_port);
@@ -458,6 +577,16 @@ static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 	case QRTR_CMD_EXIT:
 	case QRTR_CMD_PING:
 	case QRTR_CMD_RESUME_TX:
+		break;
+	case QRTR_CMD_NEW_LOOKUP:
+		rc = ctrl_cmd_new_lookup(ctx, &sq,
+					 le32_to_cpu(msg->server.service),
+					 le32_to_cpu(msg->server.instance));
+		break;
+	case QRTR_CMD_DEL_LOOKUP:
+		rc = ctrl_cmd_del_lookup(ctx, &sq,
+					 le32_to_cpu(msg->server.service),
+					 le32_to_cpu(msg->server.instance));
 		break;
 	}
 
@@ -689,6 +818,8 @@ int main(int argc, char **argv)
 	w = waiter_create();
 	if (w == NULL)
 		errx(1, "unable to create waiter");
+
+	list_init(&ctx.lookups);
 
 	rc = map_create(&nodes);
 	if (rc)
