@@ -59,9 +59,17 @@ static const struct {
 	{ 41, 0, "RF radiated performance enhancement service" },
 	{ 42, 0, "Data system determination service" },
 	{ 43, 0, "Subsystem control service" },
+	{ 49, 0, "IPA control service" },
+	{ 51, 0, "CoreSight remote tracing service" },
+	{ 64, 0, "Service registry locator service" },
+	{ 66, 0, "Service registry notification service" },
+	{ 69, 0, "ATH10k WLAN firmware service" },
 	{ 224, 0, "Card Application Toolkit service (v1)" },
 	{ 225, 0, "Remote Management Service" },
 	{ 226, 0, "Open Mobile Alliance device management service" },
+	{ 312, 0, "QBT1000 Ultrasonic Fingerprint Sensor service" },
+	{ 769, 0, "SLIMbus control service" },
+	{ 771, 0, "Peripheral Access Control Manager service" },
 };
 
 static unsigned int read_num_le(const char *str, int *rcp)
