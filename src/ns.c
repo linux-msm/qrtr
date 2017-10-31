@@ -194,6 +194,27 @@ static int service_announce_del(struct context *ctx,
 	return rc;
 }
 
+static int lookup_notify(struct context *ctx, struct sockaddr_qrtr *to,
+			 struct server *srv, bool new)
+{
+	struct qrtr_ctrl_pkt pkt = {};
+	int rc;
+
+	pkt.cmd = new ? QRTR_CMD_NEW_SERVER : QRTR_CMD_DEL_SERVER;
+	if (srv) {
+		pkt.server.service = cpu_to_le32(srv->service);
+		pkt.server.instance = cpu_to_le32(srv->instance);
+		pkt.server.node = cpu_to_le32(srv->node);
+		pkt.server.port = cpu_to_le32(srv->port);
+	}
+
+	rc = sendto(ctx->sock, &pkt, sizeof(pkt), 0,
+		    (struct sockaddr *)to, sizeof(*to));
+	if (rc < 0)
+		warn("send lookup result failed");
+	return rc;
+}
+
 static int annouce_servers(struct context *ctx, struct sockaddr_qrtr *sq)
 {
 	struct map_entry *me;
@@ -259,45 +280,38 @@ err:
 	return NULL;
 }
 
-static struct server *server_del(unsigned int node_id, unsigned int port)
+static int server_del(struct context *ctx, struct node *node, unsigned int port)
 {
+	struct lookup *lookup;
+	struct list_item *li;
 	struct map_item *mi;
 	struct server *srv;
-	struct node *node;
-
-	node = node_get(node_id);
-	if (!node)
-		return NULL;
 
 	mi = map_get(&node->services, hash_u32(port));
 	if (!mi)
-		return NULL;
+		return -ENOENT;
 
 	srv = container_of(mi, struct server, mi);
 	map_remove(&node->services, srv->mi.key);
 
-	return srv;
-}
+	/* Broadcast the removal of local services */
+	if (srv->node == ctx->local_node)
+		service_announce_del(ctx, &ctx->bcast_sq, srv);
 
-static int lookup_notify(struct context *ctx, struct sockaddr_qrtr *to,
-			 struct server *srv, bool new)
-{
-	struct qrtr_ctrl_pkt pkt = {};
-	int rc;
+	/* Announce the service's disappearance to observers */
+	list_for_each(&ctx->lookups, li) {
+		lookup = container_of(li, struct lookup, li);
+		if (lookup->service && lookup->service != srv->service)
+			continue;
+		if (lookup->instance && lookup->instance != srv->instance)
+			continue;
 
-	pkt.cmd = new ? QRTR_CMD_NEW_SERVER : QRTR_CMD_DEL_SERVER;
-	if (srv) {
-		pkt.server.service = cpu_to_le32(srv->service);
-		pkt.server.instance = cpu_to_le32(srv->instance);
-		pkt.server.node = cpu_to_le32(srv->node);
-		pkt.server.port = cpu_to_le32(srv->port);
+		lookup_notify(ctx, &lookup->sq, srv, false);
 	}
 
-	rc = sendto(ctx->sock, &pkt, sizeof(pkt), 0,
-		    (struct sockaddr *)to, sizeof(*to));
-	if (rc < 0)
-		warn("send lookup result failed");
-	return rc;
+	free(srv);
+
+	return 0;
 }
 
 static int ctrl_cmd_hello(struct context *ctx, struct sockaddr_qrtr *sq,
@@ -316,6 +330,7 @@ static int ctrl_cmd_bye(struct context *ctx, struct sockaddr_qrtr *from)
 {
 	struct qrtr_ctrl_pkt pkt;
 	struct sockaddr_qrtr sq;
+	struct node *local_node;
 	struct map_entry *me;
 	struct server *srv;
 	struct node *node;
@@ -325,18 +340,22 @@ static int ctrl_cmd_bye(struct context *ctx, struct sockaddr_qrtr *from)
 	if (!node)
 		return 0;
 
-	map_clear(&node->services, server_mi_free);
+	map_for_each(&node->services, me) {
+		srv = map_iter_data(me, struct server, mi);
+
+		server_del(ctx, node, srv->port);
+	}
 
 	/* Advertise the removal of this client to all local services */
-	node = node_get(ctx->local_node);
-	if (!node)
+	local_node = node_get(ctx->local_node);
+	if (!local_node)
 		return 0;
 
 	memset(&pkt, 0, sizeof(pkt));
 	pkt.cmd = QRTR_CMD_BYE;
 	pkt.client.node = from->sq_node;
 
-	map_for_each(&node->services, me) {
+	map_for_each(&local_node->services, me) {
 		srv = map_iter_data(me, struct server, mi);
 
 		sq.sq_family = AF_QIPCRTR;
@@ -357,6 +376,7 @@ static int ctrl_cmd_del_client(struct context *ctx, unsigned node_id,
 {
 	struct qrtr_ctrl_pkt pkt;
 	struct sockaddr_qrtr sq;
+	struct node *local_node;
 	struct list_item *tmp;
 	struct lookup *lookup;
 	struct list_item *li;
@@ -365,7 +385,7 @@ static int ctrl_cmd_del_client(struct context *ctx, unsigned node_id,
 	struct node *node;
 	int rc;
 
-	/* Remove any lookups for this client */
+	/* Remove any lookups by this client */
 	list_for_each_safe(&ctx->lookups, li, tmp) {
 		lookup = container_of(li, struct lookup, li);
 		if (lookup->sq.sq_node != node_id)
@@ -378,24 +398,20 @@ static int ctrl_cmd_del_client(struct context *ctx, unsigned node_id,
 	}
 
 	/* Remove the server belonging to this port*/
-	srv = server_del(node_id, port);
-	if (srv) {
-		if (srv->node == ctx->local_node)
-			service_announce_del(ctx, &ctx->bcast_sq, srv);
-
-		free(srv);
-	}
+	node = node_get(node_id);
+	if (node)
+		server_del(ctx, node, port);
 
 	/* Advertise the removal of this client to all local services */
-	node = node_get(ctx->local_node);
-	if (!node)
+	local_node = node_get(ctx->local_node);
+	if (!local_node)
 		return 0;
 
 	pkt.cmd = QRTR_CMD_DEL_CLIENT;
 	pkt.client.node = node_id;
 	pkt.client.port = port;
 
-	map_for_each(&node->services, me) {
+	map_for_each(&local_node->services, me) {
 		srv = map_iter_data(me, struct server, mi);
 
 		sq.sq_family = AF_QIPCRTR;
@@ -444,31 +460,13 @@ static int ctrl_cmd_del_server(struct context *ctx, unsigned int service,
 			       unsigned int instance, unsigned int node_id,
 			       unsigned int port)
 {
-	struct lookup *lookup;
-	struct list_item *li;
-	struct server *srv;
-	int rc = 0;
+	struct node *node;
 
-	srv = server_del(node_id, port);
-	if (!srv)
-		return -EINVAL;
+	node = node_get(node_id);
+	if (!node)
+		return -ENOENT;
 
-	if (srv->node == ctx->local_node)
-		rc = service_announce_del(ctx, &ctx->bcast_sq, srv);
-
-	list_for_each(&ctx->lookups, li) {
-		lookup = container_of(li, struct lookup, li);
-		if (lookup->service && lookup->service != service)
-			continue;
-		if (lookup->instance && lookup->instance != instance)
-			continue;
-
-		lookup_notify(ctx, &lookup->sq, srv, false);
-	}
-
-	free(srv);
-
-	return rc;
+	return server_del(ctx, node, port);
 }
 
 static int ctrl_cmd_new_lookup(struct context *ctx, struct sockaddr_qrtr *from,
