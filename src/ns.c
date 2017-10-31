@@ -371,8 +371,8 @@ static int ctrl_cmd_bye(struct context *ctx, struct sockaddr_qrtr *from)
 	return 0;
 }
 
-static int ctrl_cmd_del_client(struct context *ctx, unsigned node_id,
-			       unsigned port)
+static int ctrl_cmd_del_client(struct context *ctx, struct sockaddr_qrtr *from,
+			       unsigned node_id, unsigned port)
 {
 	struct qrtr_ctrl_pkt pkt;
 	struct sockaddr_qrtr sq;
@@ -384,6 +384,14 @@ static int ctrl_cmd_del_client(struct context *ctx, unsigned node_id,
 	struct server *srv;
 	struct node *node;
 	int rc;
+
+	/* Don't accept spoofed messages */
+	if (from->sq_node != node_id)
+		return -EINVAL;
+
+	/* Local DEL_CLIENT messages comes from the port being closed */
+	if (from->sq_node == ctx->local_node && from->sq_port != port)
+		return -EINVAL;
 
 	/* Remove any lookups by this client */
 	list_for_each_safe(&ctx->lookups, li, tmp) {
@@ -436,6 +444,16 @@ static int ctrl_cmd_new_server(struct context *ctx, struct sockaddr_qrtr *from,
 	struct server *srv;
 	int rc = 0;
 
+	/* Ignore specified node and port for local servers*/
+	if (from->sq_node == ctx->local_node) {
+		node_id = from->sq_node;
+		port = from->sq_port;
+	}
+
+	/* Don't accept spoofed messages */
+	if (from->sq_node != node_id)
+		return -EINVAL;
+
 	srv = server_add(service, instance, node_id, port);
 	if (!srv)
 		return -EINVAL;
@@ -456,11 +474,25 @@ static int ctrl_cmd_new_server(struct context *ctx, struct sockaddr_qrtr *from,
 	return rc;
 }
 
-static int ctrl_cmd_del_server(struct context *ctx, unsigned int service,
-			       unsigned int instance, unsigned int node_id,
-			       unsigned int port)
+static int ctrl_cmd_del_server(struct context *ctx, struct sockaddr_qrtr *from,
+			       unsigned int service, unsigned int instance,
+			       unsigned int node_id, unsigned int port)
 {
 	struct node *node;
+
+	/* Ignore specified node and port for local servers*/
+	if (from->sq_node == ctx->local_node) {
+		node_id = from->sq_node;
+		port = from->sq_port;
+	}
+
+	/* Don't accept spoofed messages */
+	if (from->sq_node != node_id)
+		return -EINVAL;
+
+	/* Local servers may only unregister themselves */
+	if (from->sq_node == ctx->local_node && from->sq_port != port)
+		return -EINVAL;
 
 	node = node_get(node_id);
 	if (!node)
@@ -477,6 +509,10 @@ static int ctrl_cmd_new_lookup(struct context *ctx, struct sockaddr_qrtr *from,
 	struct lookup *lookup;
 	struct list_item *li;
 	struct server *srv;
+
+	/* Accept only local observers */
+	if (from->sq_node != ctx->local_node)
+		return -EINVAL;
 
 	lookup = calloc(1, sizeof(*lookup));
 	if (!lookup)
@@ -570,7 +606,8 @@ static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 		rc = ctrl_cmd_bye(ctx, &sq);
 		break;
 	case QRTR_CMD_DEL_CLIENT:
-		rc = ctrl_cmd_del_client(ctx, le32_to_cpu(msg->client.node),
+		rc = ctrl_cmd_del_client(ctx, &sq,
+					 le32_to_cpu(msg->client.node),
 					 le32_to_cpu(msg->client.port));
 		break;
 	case QRTR_CMD_NEW_SERVER:
@@ -581,7 +618,8 @@ static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 					 le32_to_cpu(msg->server.port));
 		break;
 	case QRTR_CMD_DEL_SERVER:
-		rc = ctrl_cmd_del_server(ctx, le32_to_cpu(msg->server.service),
+		rc = ctrl_cmd_del_server(ctx, &sq,
+					 le32_to_cpu(msg->server.service),
 					 le32_to_cpu(msg->server.instance),
 					 le32_to_cpu(msg->server.node),
 					 le32_to_cpu(msg->server.port));
