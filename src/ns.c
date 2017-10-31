@@ -332,7 +332,9 @@ static int ctrl_cmd_bye(struct context *ctx, struct sockaddr_qrtr *from)
 	if (!node)
 		return 0;
 
+	memset(&pkt, 0, sizeof(pkt));
 	pkt.cmd = QRTR_CMD_BYE;
+	pkt.client.node = from->sq_node;
 
 	map_for_each(&node->services, me) {
 		srv = map_iter_data(me, struct server, mi);
