@@ -160,16 +160,9 @@ int qrtr_new_lookup(int sock, uint32_t service, uint16_t version, uint16_t insta
 
 	memset(&pkt, 0, sizeof(pkt));
 
-	if (!sq.sq_port) {
-		LOGE("unable to register server on unbound port");
-		return -1;
-	}
-
 	pkt.cmd = cpu_to_le32(QRTR_CMD_NEW_LOOKUP);
 	pkt.server.service = cpu_to_le32(service);
 	pkt.server.instance = cpu_to_le32(instance << 16 | version);
-	pkt.server.node = cpu_to_le32(sq.sq_node);
-	pkt.server.port = cpu_to_le32(sq.sq_port);
 
 	return qrtr_sendto(sock, sq.sq_node, QRTR_CTRL_PORT, &pkt, sizeof(pkt));
 }
