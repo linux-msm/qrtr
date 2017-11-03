@@ -70,6 +70,7 @@ static const struct {
 	{ 312, 0, "QBT1000 Ultrasonic Fingerprint Sensor service" },
 	{ 769, 0, "SLIMbus control service" },
 	{ 771, 0, "Peripheral Access Control Manager service" },
+	{ 4097, 0, "DIAG service" },
 };
 
 static unsigned int read_num_le(const char *str, int *rcp)
