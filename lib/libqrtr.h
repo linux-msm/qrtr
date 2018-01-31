@@ -5,6 +5,20 @@
 
 struct sockaddr_qrtr;
 
+struct qrtr_packet {
+	int type;
+
+	unsigned int node;
+	unsigned int port;
+
+	unsigned int service;
+	unsigned int instance;
+	unsigned int version;
+
+	void *data;
+	size_t data_len;
+};
+
 struct qrtr_ind_ops {
 	int (*bye)(uint32_t node, void *data);
 	int (*del_client)(uint32_t node, uint32_t port, void *data);
@@ -40,6 +54,9 @@ int qrtr_handle_ctrl_msg(struct sockaddr_qrtr *sq,
 			 size_t len,
 			 struct qrtr_ind_ops *ops,
 			 void *data);
+
+int qrtr_decode(struct qrtr_packet *dest, void *buf, size_t len,
+		const struct sockaddr_qrtr *sq);
 
 /* Initial kernel header didn't expose these */
 #ifndef QRTR_NODE_BCAST

@@ -276,3 +276,44 @@ int qrtr_handle_ctrl_msg(struct sockaddr_qrtr *sq,
 
 	return 0;
 }
+
+int qrtr_decode(struct qrtr_packet *dest, void *buf, size_t len,
+		const struct sockaddr_qrtr *sq)
+{
+	const struct qrtr_ctrl_pkt *ctrl = buf;
+
+	if (sq->sq_port == QRTR_PORT_CTRL){
+		if (len < sizeof(*ctrl))
+			return -EMSGSIZE;
+
+		dest->type = le32_to_cpu(ctrl->cmd);
+		switch (dest->type) {
+		case QRTR_TYPE_BYE:
+			dest->node = le32_to_cpu(ctrl->client.node);
+			break;
+		case QRTR_TYPE_DEL_CLIENT:
+			dest->node = le32_to_cpu(ctrl->client.node);
+			dest->port = le32_to_cpu(ctrl->client.port);
+			break;
+		case QRTR_TYPE_NEW_SERVER:
+		case QRTR_TYPE_DEL_SERVER:
+			dest->node = le32_to_cpu(ctrl->server.node);
+			dest->port = le32_to_cpu(ctrl->server.port);
+			dest->service = le32_to_cpu(ctrl->server.service);
+			dest->version = le32_to_cpu(ctrl->server.instance) & 0xffff;
+			dest->instance = le32_to_cpu(ctrl->server.instance) >> 16;
+			break;
+		default:
+			dest->type = 0;
+		}
+	} else {
+		dest->type = QRTR_TYPE_DATA;
+		dest->node = sq->sq_node;
+		dest->port = sq->sq_port;
+
+		dest->data = buf;
+		dest->data_len = len;
+	}
+
+	return 0;
+}
