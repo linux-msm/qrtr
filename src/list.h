@@ -1,7 +1,14 @@
 #ifndef _LIST_H_
 #define _LIST_H_
 
-#include "container.h"
+#ifndef offsetof
+#define offsetof(type, md) ((unsigned long)&((type *)0)->md)
+#endif
+
+#ifndef container_of
+#define container_of(ptr, type, member) \
+  ((type *)((char *)(ptr) - offsetof(type, member)))
+#endif
 
 struct list_item {
 	struct list_item *next;

@@ -1,7 +1,19 @@
 #ifndef _QRTR_LIB_H_
 #define _QRTR_LIB_H_
 
+#include <linux/qrtr.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <stdint.h>
+
+#ifndef offsetof
+#define offsetof(type, md) ((unsigned long)&((type *)0)->md)
+#endif
+
+#ifndef container_of
+#define container_of(ptr, type, member) \
+  ((type *)((char *)(ptr) - offsetof(type, member)))
+#endif
 
 struct sockaddr_qrtr;
 

@@ -14,7 +14,6 @@
 #include "hash.h"
 #include "waiter.h"
 #include "list.h"
-#include "container.h"
 #include "util.h"
 #include "ns.h"
 
