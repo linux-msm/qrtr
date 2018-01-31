@@ -1,5 +1,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <linux/qrtr.h>
 #include <unistd.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -14,21 +15,22 @@
 #include "waiter.h"
 #include "list.h"
 #include "container.h"
-#include "qrtr.h"
 #include "util.h"
 #include "ns.h"
 
+#include "libqrtr.h"
+
 static const char *ctrl_pkt_strings[] = {
-	[QRTR_CMD_HELLO]	= "hello",
-	[QRTR_CMD_BYE]		= "bye",
-	[QRTR_CMD_NEW_SERVER]	= "new-server",
-	[QRTR_CMD_DEL_SERVER]	= "del-server",
-	[QRTR_CMD_DEL_CLIENT]	= "del-client",
-	[QRTR_CMD_RESUME_TX]	= "resume-tx",
-	[QRTR_CMD_EXIT]		= "exit",
-	[QRTR_CMD_PING]		= "ping",
-	[QRTR_CMD_NEW_LOOKUP]	= "new-lookup",
-	[QRTR_CMD_DEL_LOOKUP]	= "del-lookup",
+	[QRTR_TYPE_HELLO]	= "hello",
+	[QRTR_TYPE_BYE]		= "bye",
+	[QRTR_TYPE_NEW_SERVER]	= "new-server",
+	[QRTR_TYPE_DEL_SERVER]	= "del-server",
+	[QRTR_TYPE_DEL_CLIENT]	= "del-client",
+	[QRTR_TYPE_RESUME_TX]	= "resume-tx",
+	[QRTR_TYPE_EXIT]	= "exit",
+	[QRTR_TYPE_PING]	= "ping",
+	[QRTR_TYPE_NEW_LOOKUP]	= "new-lookup",
+	[QRTR_TYPE_DEL_LOOKUP]	= "del-lookup",
 };
 
 #define dprintf(...)
@@ -156,7 +158,7 @@ static int service_announce_new(struct context *ctx,
 	dprintf("advertising new server [%d:%x]@[%d:%d]\n",
 		srv->service, srv->instance, srv->node, srv->port);
 
-	cmsg.cmd = cpu_to_le32(QRTR_CMD_NEW_SERVER);
+	cmsg.cmd = cpu_to_le32(QRTR_TYPE_NEW_SERVER);
 	cmsg.server.service = cpu_to_le32(srv->service);
 	cmsg.server.instance = cpu_to_le32(srv->instance);
 	cmsg.server.node = cpu_to_le32(srv->node);
@@ -180,7 +182,7 @@ static int service_announce_del(struct context *ctx,
 	dprintf("advertising removal of server [%d:%x]@[%d:%d]\n",
 		srv->service, srv->instance, srv->node, srv->port);
 
-	cmsg.cmd = cpu_to_le32(QRTR_CMD_DEL_SERVER);
+	cmsg.cmd = cpu_to_le32(QRTR_TYPE_DEL_SERVER);
 	cmsg.server.service = cpu_to_le32(srv->service);
 	cmsg.server.instance = cpu_to_le32(srv->instance);
 	cmsg.server.node = cpu_to_le32(srv->node);
@@ -200,7 +202,7 @@ static int lookup_notify(struct context *ctx, struct sockaddr_qrtr *to,
 	struct qrtr_ctrl_pkt pkt = {};
 	int rc;
 
-	pkt.cmd = new ? QRTR_CMD_NEW_SERVER : QRTR_CMD_DEL_SERVER;
+	pkt.cmd = new ? QRTR_TYPE_NEW_SERVER : QRTR_TYPE_DEL_SERVER;
 	if (srv) {
 		pkt.server.service = cpu_to_le32(srv->service);
 		pkt.server.instance = cpu_to_le32(srv->instance);
@@ -352,7 +354,7 @@ static int ctrl_cmd_bye(struct context *ctx, struct sockaddr_qrtr *from)
 		return 0;
 
 	memset(&pkt, 0, sizeof(pkt));
-	pkt.cmd = QRTR_CMD_BYE;
+	pkt.cmd = QRTR_TYPE_BYE;
 	pkt.client.node = from->sq_node;
 
 	map_for_each(&local_node->services, me) {
@@ -415,7 +417,7 @@ static int ctrl_cmd_del_client(struct context *ctx, struct sockaddr_qrtr *from,
 	if (!local_node)
 		return 0;
 
-	pkt.cmd = QRTR_CMD_DEL_CLIENT;
+	pkt.cmd = QRTR_TYPE_DEL_CLIENT;
 	pkt.client.node = node_id;
 	pkt.client.port = port;
 
@@ -599,41 +601,41 @@ static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 
 	rc = 0;
 	switch (cmd) {
-	case QRTR_CMD_HELLO:
+	case QRTR_TYPE_HELLO:
 		rc = ctrl_cmd_hello(ctx, &sq, buf, len);
 		break;
-	case QRTR_CMD_BYE:
+	case QRTR_TYPE_BYE:
 		rc = ctrl_cmd_bye(ctx, &sq);
 		break;
-	case QRTR_CMD_DEL_CLIENT:
+	case QRTR_TYPE_DEL_CLIENT:
 		rc = ctrl_cmd_del_client(ctx, &sq,
 					 le32_to_cpu(msg->client.node),
 					 le32_to_cpu(msg->client.port));
 		break;
-	case QRTR_CMD_NEW_SERVER:
+	case QRTR_TYPE_NEW_SERVER:
 		rc = ctrl_cmd_new_server(ctx, &sq,
 					 le32_to_cpu(msg->server.service),
 					 le32_to_cpu(msg->server.instance),
 					 le32_to_cpu(msg->server.node),
 					 le32_to_cpu(msg->server.port));
 		break;
-	case QRTR_CMD_DEL_SERVER:
+	case QRTR_TYPE_DEL_SERVER:
 		rc = ctrl_cmd_del_server(ctx, &sq,
 					 le32_to_cpu(msg->server.service),
 					 le32_to_cpu(msg->server.instance),
 					 le32_to_cpu(msg->server.node),
 					 le32_to_cpu(msg->server.port));
 		break;
-	case QRTR_CMD_EXIT:
-	case QRTR_CMD_PING:
-	case QRTR_CMD_RESUME_TX:
+	case QRTR_TYPE_EXIT:
+	case QRTR_TYPE_PING:
+	case QRTR_TYPE_RESUME_TX:
 		break;
-	case QRTR_CMD_NEW_LOOKUP:
+	case QRTR_TYPE_NEW_LOOKUP:
 		rc = ctrl_cmd_new_lookup(ctx, &sq,
 					 le32_to_cpu(msg->server.service),
 					 le32_to_cpu(msg->server.instance));
 		break;
-	case QRTR_CMD_DEL_LOOKUP:
+	case QRTR_TYPE_DEL_LOOKUP:
 		rc = ctrl_cmd_del_lookup(ctx, &sq,
 					 le32_to_cpu(msg->server.service),
 					 le32_to_cpu(msg->server.instance));
@@ -653,7 +655,7 @@ static int say_hello(struct context *ctx)
 	int rc;
 
 	memset(&pkt, 0, sizeof(pkt));
-	pkt.cmd = cpu_to_le32(QRTR_CMD_HELLO);
+	pkt.cmd = cpu_to_le32(QRTR_TYPE_HELLO);
 
 	rc = sendto(ctx->sock, &pkt, sizeof(pkt), 0,
 		    (struct sockaddr *)&ctx->bcast_sq, sizeof(ctx->bcast_sq));
@@ -704,7 +706,7 @@ int main(int argc, char **argv)
 	rc = getsockname(ctx.sock, (void*)&sq, &sl);
 	if (rc < 0)
 		err(1, "getsockname()");
-	sq.sq_port = QRTR_CTRL_PORT;
+	sq.sq_port = QRTR_PORT_CTRL;
 	ctx.local_node = sq.sq_node;
 
 	rc = bind(ctx.sock, (void *)&sq, sizeof(sq));
@@ -712,8 +714,8 @@ int main(int argc, char **argv)
 		err(1, "bind control socket");
 
 	ctx.bcast_sq.sq_family = AF_QIPCRTR;
-	ctx.bcast_sq.sq_node = QRTRADDR_ANY;
-	ctx.bcast_sq.sq_port = QRTR_CTRL_PORT;
+	ctx.bcast_sq.sq_node = QRTR_NODE_BCAST;
+	ctx.bcast_sq.sq_port = QRTR_PORT_CTRL;
 
 	rc = say_hello(&ctx);
 	if (rc)

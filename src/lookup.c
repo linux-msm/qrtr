@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <linux/qrtr.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,7 +9,7 @@
 #include <errno.h>
 #include <err.h>
 
-#include "qrtr.h"
+#include "libqrtr.h"
 #include "util.h"
 #include "ns.h"
 
@@ -125,12 +126,12 @@ int main(int argc, char **argv)
 	if (rc || sq.sq_family != AF_QIPCRTR || sl != sizeof(sq))
 		err(1, "getsockname()");
 
-	sq.sq_port = QRTR_CTRL_PORT;
+	sq.sq_port = QRTR_PORT_CTRL;
 
 	tv.tv_sec = 1;
 	tv.tv_usec = 0;
 
-	pkt.cmd = cpu_to_le32(QRTR_CMD_NEW_LOOKUP);
+	pkt.cmd = cpu_to_le32(QRTR_TYPE_NEW_LOOKUP);
 
 	rc = setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 	if (rc)
@@ -147,7 +148,7 @@ int main(int argc, char **argv)
 		const char *name = NULL;
 		unsigned int i;
 
-		if (len < sizeof(pkt) || type != QRTR_CMD_NEW_SERVER) {
+		if (len < sizeof(pkt) || type != QRTR_TYPE_NEW_SERVER) {
 			warn("invalid/short packet");
 			continue;
 		}

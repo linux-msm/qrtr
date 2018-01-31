@@ -3,13 +3,14 @@
 #include <limits.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
+#include <linux/qrtr.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 
-#include "qrtr.h"
+#include "libqrtr.h"
 
 static void usage(void)
 {

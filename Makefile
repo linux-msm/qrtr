@@ -26,9 +26,13 @@ $(proj)-ns-srcs := \
 	src/waiter.c \
 	src/util.c \
 
+$(proj)-ns-cflags := -Ilib
+
 $(proj)-lookup-srcs := \
 	src/lookup.c \
 	src/util.c \
+
+$(proj)-lookup-cflags := -Ilib
 
 lib$(proj).so-srcs := \
 	lib/libqrtr.c \

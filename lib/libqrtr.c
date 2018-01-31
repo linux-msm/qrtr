@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <linux/qrtr.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,7 +9,6 @@
 #include <errno.h>
 #include <poll.h>
 
-#include "qrtr.h"
 #include "libqrtr.h"
 #include "ns.h"
 
@@ -107,11 +107,11 @@ int qrtr_new_server(int sock, uint32_t service, uint16_t version, uint16_t insta
 
 	memset(&pkt, 0, sizeof(pkt));
 
-	pkt.cmd = cpu_to_le32(QRTR_CMD_NEW_SERVER);
+	pkt.cmd = cpu_to_le32(QRTR_TYPE_NEW_SERVER);
 	pkt.server.service = cpu_to_le32(service);
 	pkt.server.instance = cpu_to_le32(instance << 16 | version);
 
-	return qrtr_sendto(sock, sq.sq_node, QRTR_CTRL_PORT, &pkt, sizeof(pkt));
+	return qrtr_sendto(sock, sq.sq_node, QRTR_PORT_CTRL, &pkt, sizeof(pkt));
 }
 
 int qrtr_remove_server(int sock, uint32_t service, uint16_t version, uint16_t instance)
@@ -124,13 +124,13 @@ int qrtr_remove_server(int sock, uint32_t service, uint16_t version, uint16_t in
 
 	memset(&pkt, 0, sizeof(pkt));
 
-	pkt.cmd = cpu_to_le32(QRTR_CMD_DEL_SERVER);
+	pkt.cmd = cpu_to_le32(QRTR_TYPE_DEL_SERVER);
 	pkt.server.service = cpu_to_le32(service);
 	pkt.server.instance = cpu_to_le32(instance << 16 | version);
 	pkt.server.node = cpu_to_le32(sq.sq_node);
 	pkt.server.port = cpu_to_le32(sq.sq_port);
 
-	return qrtr_sendto(sock, sq.sq_node, QRTR_CTRL_PORT, &pkt, sizeof(pkt));
+	return qrtr_sendto(sock, sq.sq_node, QRTR_PORT_CTRL, &pkt, sizeof(pkt));
 }
 
 int qrtr_publish(int sock, uint32_t service, uint16_t version, uint16_t instance)
@@ -153,11 +153,11 @@ int qrtr_new_lookup(int sock, uint32_t service, uint16_t version, uint16_t insta
 
 	memset(&pkt, 0, sizeof(pkt));
 
-	pkt.cmd = cpu_to_le32(QRTR_CMD_NEW_LOOKUP);
+	pkt.cmd = cpu_to_le32(QRTR_TYPE_NEW_LOOKUP);
 	pkt.server.service = cpu_to_le32(service);
 	pkt.server.instance = cpu_to_le32(instance << 16 | version);
 
-	return qrtr_sendto(sock, sq.sq_node, QRTR_CTRL_PORT, &pkt, sizeof(pkt));
+	return qrtr_sendto(sock, sq.sq_node, QRTR_PORT_CTRL, &pkt, sizeof(pkt));
 }
 
 int qrtr_remove_lookup(int sock, uint32_t service, uint16_t version, uint16_t instance)
@@ -170,13 +170,13 @@ int qrtr_remove_lookup(int sock, uint32_t service, uint16_t version, uint16_t in
 
 	memset(&pkt, 0, sizeof(pkt));
 
-	pkt.cmd = cpu_to_le32(QRTR_CMD_DEL_LOOKUP);
+	pkt.cmd = cpu_to_le32(QRTR_TYPE_DEL_LOOKUP);
 	pkt.server.service = cpu_to_le32(service);
 	pkt.server.instance = cpu_to_le32(instance << 16 | version);
 	pkt.server.node = cpu_to_le32(sq.sq_node);
 	pkt.server.port = cpu_to_le32(sq.sq_port);
 
-	return qrtr_sendto(sock, sq.sq_node, QRTR_CTRL_PORT, &pkt, sizeof(pkt));
+	return qrtr_sendto(sock, sq.sq_node, QRTR_PORT_CTRL, &pkt, sizeof(pkt));
 }
 
 int qrtr_poll(int sock, unsigned int ms)
@@ -221,7 +221,7 @@ int qrtr_recvfrom(int sock, void *buf, unsigned int bsz, uint32_t *node, uint32_
 
 int qrtr_is_ctrl_addr(struct sockaddr_qrtr *sq)
 {
-	return sq->sq_port == QRTR_CTRL_PORT;
+	return sq->sq_port == QRTR_PORT_CTRL;
 }
 
 int qrtr_handle_ctrl_msg(struct sockaddr_qrtr *sq,
@@ -243,14 +243,14 @@ int qrtr_handle_ctrl_msg(struct sockaddr_qrtr *sq,
 
 	cmd = le32_to_cpu(pkt->cmd);
 
-	if (cmd == QRTR_CMD_BYE && ops->bye) {
+	if (cmd == QRTR_TYPE_BYE && ops->bye) {
 		return ops->bye(sq->sq_node, data);
-	} else if (cmd == QRTR_CMD_DEL_CLIENT && ops->del_client) {
+	} else if (cmd == QRTR_TYPE_DEL_CLIENT && ops->del_client) {
 		if (len < 3 * sizeof(__le32))
 			return -EINVAL;
 
 		return ops->del_client(pkt->client.node, pkt->client.port, data);
-	} else if (cmd == QRTR_CMD_NEW_SERVER && ops->new_server) {
+	} else if (cmd == QRTR_TYPE_NEW_SERVER && ops->new_server) {
 		if (len < 5 * sizeof(__le32))
 			return -EINVAL;
 
@@ -261,7 +261,7 @@ int qrtr_handle_ctrl_msg(struct sockaddr_qrtr *sq,
 		instance = le32_to_cpu(pkt->server.instance) >> 16;
 
 		return ops->new_server(service, version, instance, node, port, data);
-	} else if (cmd == QRTR_CMD_DEL_SERVER && ops->del_server) {
+	} else if (cmd == QRTR_TYPE_DEL_SERVER && ops->del_server) {
 		if (len < 5 * sizeof(__le32))
 			return -EINVAL;
 
