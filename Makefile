@@ -36,6 +36,7 @@ $(proj)-lookup-cflags := -Ilib
 
 lib$(proj).so-srcs := \
 	lib/libqrtr.c \
+	lib/qmi.c
 
 lib$(proj).so-cflags := -fPIC -Isrc
 

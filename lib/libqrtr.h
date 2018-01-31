@@ -31,6 +31,99 @@ struct qrtr_packet {
 	size_t data_len;
 };
 
+#define DEFINE_QRTR_PACKET(pkt, size) \
+	char pkt ## _buf[size]; \
+	struct qrtr_packet pkt = { .data = pkt ##_buf, \
+				   .data_len = sizeof(pkt ##_buf), }
+
+/**
+ * qmi_header - wireformat header of QMI messages
+ * @type:       type of message
+ * @txn_id:     transaction id
+ * @msg_id:     message id
+ * @msg_len:    length of message payload following header
+ */
+struct qmi_header {
+	uint8_t type;
+	uint16_t txn_id;
+	uint16_t msg_id;
+	uint16_t msg_len;
+} __attribute__((packed));
+
+#define QMI_REQUEST     0
+#define QMI_RESPONSE    2
+#define QMI_INDICATION  4
+
+#define QMI_COMMON_TLV_TYPE 0
+
+enum qmi_elem_type {
+	QMI_EOTI,
+	QMI_OPT_FLAG,
+	QMI_DATA_LEN,
+	QMI_UNSIGNED_1_BYTE,
+	QMI_UNSIGNED_2_BYTE,
+	QMI_UNSIGNED_4_BYTE,
+	QMI_UNSIGNED_8_BYTE,
+	QMI_SIGNED_2_BYTE_ENUM,
+	QMI_SIGNED_4_BYTE_ENUM,
+	QMI_STRUCT,
+	QMI_STRING,
+};
+
+enum qmi_array_type {
+	NO_ARRAY,
+	STATIC_ARRAY,
+	VAR_LEN_ARRAY,
+};
+
+/**
+ * struct qmi_elem_info - describes how to encode a single QMI element
+ * @data_type:  Data type of this element.
+ * @elem_len:   Array length of this element, if an array.
+ * @elem_size:  Size of a single instance of this data type.
+ * @array_type: Array type of this element.
+ * @tlv_type:   QMI message specific type to identify which element
+ *              is present in an incoming message.
+ * @offset:     Specifies the offset of the first instance of this
+ *              element in the data structure.
+ * @ei_array:   Null-terminated array of @qmi_elem_info to describe nested
+ *              structures.
+ */
+struct qmi_elem_info {
+	enum qmi_elem_type data_type;
+	uint32_t elem_len;
+	uint32_t elem_size;
+	enum qmi_array_type array_type;
+	uint8_t tlv_type;
+	uint32_t offset;
+	struct qmi_elem_info *ei_array;
+};
+
+#define QMI_RESULT_SUCCESS_V01                  0
+#define QMI_RESULT_FAILURE_V01                  1
+
+#define QMI_ERR_NONE_V01                        0
+#define QMI_ERR_MALFORMED_MSG_V01               1
+#define QMI_ERR_NO_MEMORY_V01                   2
+#define QMI_ERR_INTERNAL_V01                    3
+#define QMI_ERR_CLIENT_IDS_EXHAUSTED_V01        5
+#define QMI_ERR_INVALID_ID_V01                  41
+#define QMI_ERR_ENCODING_V01                    58
+#define QMI_ERR_INCOMPATIBLE_STATE_V01          90
+#define QMI_ERR_NOT_SUPPORTED_V01               94
+
+/**
+ * qmi_response_type_v01 - common response header (decoded)
+ * @result:     result of the transaction
+ * @error:      error value, when @result is QMI_RESULT_FAILURE_V01
+ */
+struct qmi_response_type_v01 {
+	uint16_t result;
+	uint16_t error;
+};
+
+extern struct qmi_elem_info qmi_response_type_v01_ei[];
+
 struct qrtr_ind_ops {
 	int (*bye)(uint32_t node, void *data);
 	int (*del_client)(uint32_t node, uint32_t port, void *data);
@@ -70,6 +163,14 @@ int qrtr_handle_ctrl_msg(struct sockaddr_qrtr *sq,
 int qrtr_decode(struct qrtr_packet *dest, void *buf, size_t len,
 		const struct sockaddr_qrtr *sq);
 
+int qmi_decode_header(struct qrtr_packet *pkt, unsigned int *msg_id);
+int qmi_decode_message(void *c_struct, unsigned int *txn,
+		       const struct qrtr_packet *pkt,
+		       int type, int id, struct qmi_elem_info *ei);
+ssize_t qmi_encode_message(struct qrtr_packet *pkt, int type, int msg_id,
+			   int txn_id, const void *c_struct,
+			   struct qmi_elem_info *ei);
+
 /* Initial kernel header didn't expose these */
 #ifndef QRTR_NODE_BCAST
 
@@ -106,7 +207,7 @@ struct qrtr_ctrl_pkt {
                         __le32 port;
                 } client;
         };
-} __packed;
+} __attribute__((packed));
 
 #endif
 #endif
