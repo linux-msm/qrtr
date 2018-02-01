@@ -36,20 +36,6 @@ struct qrtr_packet {
 	struct qrtr_packet pkt = { .data = pkt ##_buf, \
 				   .data_len = sizeof(pkt ##_buf), }
 
-/**
- * qmi_header - wireformat header of QMI messages
- * @type:       type of message
- * @txn_id:     transaction id
- * @msg_id:     message id
- * @msg_len:    length of message payload following header
- */
-struct qmi_header {
-	uint8_t type;
-	uint16_t txn_id;
-	uint16_t msg_id;
-	uint16_t msg_len;
-} __attribute__((packed));
-
 #define QMI_REQUEST     0
 #define QMI_RESPONSE    2
 #define QMI_INDICATION  4
@@ -124,15 +110,6 @@ struct qmi_response_type_v01 {
 
 extern struct qmi_elem_info qmi_response_type_v01_ei[];
 
-struct qrtr_ind_ops {
-	int (*bye)(uint32_t node, void *data);
-	int (*del_client)(uint32_t node, uint32_t port, void *data);
-	int (*new_server)(uint32_t service, uint16_t version, uint16_t instance,
-			  uint32_t node, uint32_t port, void *data);
-	int (*del_server)(uint32_t service, uint16_t version, uint16_t instance,
-			  uint32_t node, uint32_t port, void *data);
-};
-
 int qrtr_open(int rport);
 void qrtr_close(int sock);
 
@@ -150,15 +127,6 @@ int qrtr_new_lookup(int sock, uint32_t service, uint16_t version, uint16_t insta
 int qrtr_remove_lookup(int sock, uint32_t service, uint16_t version, uint16_t instance);
 
 int qrtr_poll(int sock, unsigned int ms);
-int qrtr_lookup(int sock, uint32_t service, uint16_t version, uint16_t instance, uint32_t ifilter,
-		void (* cb)(void *,uint32_t,uint32_t,uint32_t,uint32_t), void *udata);
-
-int qrtr_is_ctrl_addr(struct sockaddr_qrtr *sq);
-int qrtr_handle_ctrl_msg(struct sockaddr_qrtr *sq,
-			 const void *buf,
-			 size_t len,
-			 struct qrtr_ind_ops *ops,
-			 void *data);
 
 int qrtr_decode(struct qrtr_packet *dest, void *buf, size_t len,
 		const struct sockaddr_qrtr *sq);
