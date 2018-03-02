@@ -15,6 +15,10 @@
   ((type *)((char *)(ptr) - offsetof(type, member)))
 #endif
 
+#ifndef AF_QIPCRTR
+#define AF_QIPCRTR 42
+#endif
+
 struct sockaddr_qrtr;
 
 struct qrtr_packet {
