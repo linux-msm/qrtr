@@ -19,6 +19,8 @@ SFLAGS := -I$(shell $(CC) -print-file-name=include) -Wno-non-pointer-null
 $(proj)-cfg-srcs := \
 	src/cfg.c
 
+$(proj)-cfg-cflags := -Ilib
+
 $(proj)-ns-srcs := \
 	src/ns.c \
 	src/map.c \
