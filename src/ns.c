@@ -1,6 +1,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <linux/qrtr.h>
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
 #include <unistd.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -9,6 +11,7 @@
 #include <stdio.h>
 #include <err.h>
 #include <errno.h>
+#include <limits.h>
 
 #include "map.h"
 #include "hash.h"
@@ -679,14 +682,98 @@ static void node_mi_free(struct map_item *mi)
 	free(node);
 }
 
+static void qrtr_set_address(uint32_t addr)
+{
+	struct {
+		struct nlmsghdr nh;
+		struct ifaddrmsg ifa;
+		char attrbuf[32];
+	} req;
+	struct {
+		struct nlmsghdr nh;
+		struct nlmsgerr err;
+	} resp;
+	struct sockaddr_qrtr sq;
+	struct rtattr *rta;
+	socklen_t sl = sizeof(sq);
+	int sock;
+	int ret;
+
+	/* Trigger loading of the qrtr kernel module */
+	sock = socket(AF_QIPCRTR, SOCK_DGRAM, 0);
+	if (sock < 0)
+		err(1, "failed to create AF_QIPCRTR socket");
+
+	ret = getsockname(sock, (void*)&sq, &sl);
+	if (ret < 0)
+		err(1, "getsockname()");
+	close(sock);
+
+	/* Skip configuring the address, if it's same as current */
+	if (sl == sizeof(sq) && sq.sq_node == addr)
+		return;
+
+	sock = socket(AF_NETLINK, SOCK_DGRAM, NETLINK_ROUTE);
+	if (sock < 0)
+		err(1, "failed to create netlink socket");
+
+	memset(&req, 0, sizeof(req));
+	req.nh.nlmsg_len = NLMSG_SPACE(sizeof(struct ifaddrmsg));
+	req.nh.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
+	req.nh.nlmsg_type = RTM_NEWADDR;
+	req.ifa.ifa_family = AF_QIPCRTR;
+
+	rta = (struct rtattr *)(((char *) &req) + req.nh.nlmsg_len);
+	rta->rta_type = IFA_LOCAL;
+	rta->rta_len = RTA_LENGTH(sizeof(addr));
+	memcpy(RTA_DATA(rta), &addr, sizeof(addr));
+
+	req.nh.nlmsg_len += rta->rta_len;
+
+	ret = send(sock, &req, req.nh.nlmsg_len, 0);
+	if (ret < 0)
+		err(1, "failed to send netlink request");
+
+	ret = recv(sock, &resp, sizeof(resp), 0);
+	if (ret < 0)
+		err(1, "failed to receive netlink response");
+
+	if (resp.nh.nlmsg_type == NLMSG_ERROR && resp.err.error != 0) {
+		errno = -resp.err.error;
+		err(1, "failed to configure node id");
+	}
+
+	close(sock);
+}
+
+static void usage(void)
+{
+	extern char *__progname;
+
+	fprintf(stderr, "%s [<node-id>]\n", __progname);
+	exit(1);
+}
+
 int main(int argc, char **argv)
 {
 	struct waiter_ticket *tkt;
 	struct sockaddr_qrtr sq;
 	struct context ctx;
+	unsigned long addr = (unsigned long)-1;
 	struct waiter *w;
 	socklen_t sl = sizeof(sq);
+	char *ep;
 	int rc;
+
+	if (argc == 2) {
+		addr = strtoul(argv[1], &ep, 10);
+		if (argv[1][0] == '\0' || *ep != '\0' || addr >= UINT_MAX)
+			usage();
+
+		qrtr_set_address(addr);
+	} else if (argc > 2) {
+		usage();
+	}
 
 	w = waiter_create();
 	if (w == NULL)
