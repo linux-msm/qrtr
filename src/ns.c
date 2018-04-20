@@ -750,7 +750,7 @@ static void usage(void)
 {
 	extern char *__progname;
 
-	fprintf(stderr, "%s [<node-id>]\n", __progname);
+	fprintf(stderr, "%s [-f] [<node-id>]\n", __progname);
 	exit(1);
 }
 
@@ -762,18 +762,32 @@ int main(int argc, char **argv)
 	unsigned long addr = (unsigned long)-1;
 	struct waiter *w;
 	socklen_t sl = sizeof(sq);
+	bool foreground = false;
 	char *ep;
+	int opt;
 	int rc;
 
-	if (argc == 2) {
-		addr = strtoul(argv[1], &ep, 10);
+	while ((opt = getopt(argc, argv, "f")) != -1) {
+		switch (opt) {
+		case 'f':
+			foreground = true;
+			break;
+		default:
+			usage();
+		}
+	}
+
+	if (optind < argc) {
+		addr = strtoul(argv[optind], &ep, 10);
 		if (argv[1][0] == '\0' || *ep != '\0' || addr >= UINT_MAX)
 			usage();
 
 		qrtr_set_address(addr);
-	} else if (argc > 2) {
-		usage();
+		optind++;
 	}
+
+	if (optind != argc)
+		usage();
 
 	w = waiter_create();
 	if (w == NULL)
@@ -807,7 +821,8 @@ int main(int argc, char **argv)
 	if (rc)
 		err(1, "unable to say hello");
 
-	if (fork() != 0) {
+	/* If we're going to background, fork and exit parent */
+	if (!foreground && fork() != 0) {
 		close(ctx.sock);
 		exit(0);
 	}
