@@ -9,6 +9,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include "libqrtr.h"
 
@@ -45,6 +46,12 @@ int main(int argc, char **argv)
 	if (argv[1][0] == '\0' || *ep != '\0' || addrul >= UINT_MAX)
 		usage();
 	addr = addrul;
+
+	/* Trigger loading of the qrtr kernel module */
+	sock = socket(AF_QIPCRTR, SOCK_DGRAM, 0);
+	if (sock < 0)
+		err(1, "failed to create AF_QIPCRTR socket");
+	close(sock);
 
 	sock = socket(AF_NETLINK, SOCK_DGRAM, NETLINK_ROUTE);
 	if (sock < 0)
