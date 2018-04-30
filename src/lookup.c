@@ -1,5 +1,6 @@
 #include <err.h>
 #include <errno.h>
+#include <libgen.h>
 #include <linux/qrtr.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -103,6 +104,7 @@ int main(int argc, char **argv)
 	int sock;
 	int len;
 	int rc;
+	const char *progname = basename(argv[0]);
 
 	rc = 0;
 	memset(&pkt, 0, sizeof(pkt));
@@ -116,7 +118,7 @@ int main(int argc, char **argv)
 	case 1: break;
 	}
 	if (rc)
-		errx(1, "Usage: %s [<service> [<instance> [<filter>]]]", argv[0]);
+		errx(1, "Usage: %s [<service> [<instance> [<filter>]]]", progname);
 
 	sock = socket(AF_QIPCRTR, SOCK_DGRAM, 0);
 	if (sock < 0)

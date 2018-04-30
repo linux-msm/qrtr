@@ -1,5 +1,6 @@
 #include <err.h>
 #include <errno.h>
+#include <libgen.h>
 #include <limits.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
@@ -13,11 +14,9 @@
 
 #include "libqrtr.h"
 
-static void usage(void)
+static void usage(const char *progname)
 {
-	extern char *__progname;
-
-	fprintf(stderr, "%s <node-id>\n", __progname);
+	fprintf(stderr, "%s <node-id>\n", progname);
 	exit(1);
 }
 
@@ -38,13 +37,14 @@ int main(int argc, char **argv)
 	char *ep;
 	int sock;
 	int ret;
+	const char *progname = basename(argv[0]);
 
 	if (argc != 2)
-		usage();
+		usage(progname);
 
 	addrul = strtoul(argv[1], &ep, 10);
 	if (argv[1][0] == '\0' || *ep != '\0' || addrul >= UINT_MAX)
-		usage();
+		usage(progname);
 	addr = addrul;
 
 	/* Trigger loading of the qrtr kernel module */
