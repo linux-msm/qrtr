@@ -17,12 +17,14 @@ endif
 SFLAGS := -I$(shell $(CC) -print-file-name=include) -Wno-non-pointer-null
 
 $(proj)-cfg-srcs := \
+	lib/logging.c \
 	src/addr.c \
 	src/cfg.c \
 
 $(proj)-cfg-cflags := -Ilib
 
 $(proj)-ns-srcs := \
+	lib/logging.c \
 	src/addr.c \
 	src/ns.c \
 	src/map.c \
@@ -33,12 +35,14 @@ $(proj)-ns-srcs := \
 $(proj)-ns-cflags := -Ilib
 
 $(proj)-lookup-srcs := \
+	lib/logging.c \
 	src/lookup.c \
 	src/util.c \
 
 $(proj)-lookup-cflags := -Ilib
 
 lib$(proj).so-srcs := \
+	lib/logging.c \
 	lib/qrtr.c \
 	lib/qmi.c
 

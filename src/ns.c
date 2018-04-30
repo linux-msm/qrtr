@@ -23,6 +23,7 @@
 #include "waiter.h"
 
 #include "libqrtr.h"
+#include "logging.h"
 
 static const char *ctrl_pkt_strings[] = {
 	[QRTR_TYPE_HELLO]	= "hello",
@@ -103,7 +104,7 @@ static struct node *node_get(unsigned int node_id)
 
 	rc = map_create(&node->services);
 	if (rc)
-		errx(1, "unable to create map");
+		LOGE_AND_EXIT("unable to create map");
 
 	rc = map_put(&nodes, hash_u32(node_id), &node->mi);
 	if (rc) {
@@ -704,6 +705,8 @@ int main(int argc, char **argv)
 	int rc;
 	const char *progname = basename(argv[0]);
 
+	qlog_setup(progname);
+
 	while ((opt = getopt(argc, argv, "f")) != -1) {
 		switch (opt) {
 		case 'f':
@@ -728,27 +731,27 @@ int main(int argc, char **argv)
 
 	w = waiter_create();
 	if (w == NULL)
-		errx(1, "unable to create waiter");
+		LOGE_AND_EXIT("unable to create waiter");
 
 	list_init(&ctx.lookups);
 
 	rc = map_create(&nodes);
 	if (rc)
-		errx(1, "unable to create node map");
+		LOGE_AND_EXIT("unable to create node map");
 
 	ctx.sock = socket(AF_QIPCRTR, SOCK_DGRAM, 0);
 	if (ctx.sock < 0)
-		err(1, "unable to create control socket");
+		PLOGE_AND_EXIT("unable to create control socket");
 
 	rc = getsockname(ctx.sock, (void*)&sq, &sl);
 	if (rc < 0)
-		err(1, "getsockname()");
+		PLOGE_AND_EXIT("getsockname()");
 	sq.sq_port = QRTR_PORT_CTRL;
 	ctx.local_node = sq.sq_node;
 
 	rc = bind(ctx.sock, (void *)&sq, sizeof(sq));
 	if (rc < 0)
-		err(1, "bind control socket");
+		PLOGE_AND_EXIT("bind control socket");
 
 	ctx.bcast_sq.sq_family = AF_QIPCRTR;
 	ctx.bcast_sq.sq_node = QRTR_NODE_BCAST;
@@ -756,7 +759,7 @@ int main(int argc, char **argv)
 
 	rc = say_hello(&ctx);
 	if (rc)
-		err(1, "unable to say hello");
+		PLOGE_AND_EXIT("unable to say hello");
 
 	/* If we're going to background, fork and exit parent */
 	if (!foreground && fork() != 0) {

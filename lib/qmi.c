@@ -34,6 +34,7 @@
 #include <string.h>
 
 #include "libqrtr.h"
+#include "logging.h"
 
 /**
  * qmi_header - wireformat header of QMI messages
@@ -245,7 +246,7 @@ static int qmi_encode_struct_elem(struct qmi_elem_info *ei_array,
 		rc = qmi_encode(temp_ei->ei_array, buf_dst, buf_src,
 				out_buf_len - encoded_bytes, enc_level);
 		if (rc < 0) {
-			fprintf(stderr, "%s: STRUCT Encode failure\n", __func__);
+			LOGW("%s: STRUCT Encode failure\n", __func__);
 			return rc;
 		}
 		buf_dst = buf_dst + rc;
@@ -286,22 +287,22 @@ static int qmi_encode_string_elem(struct qmi_elem_info *ei_array,
 	string_len_sz = temp_ei->elem_len <= 256 ?
 			sizeof(uint8_t) : sizeof(uint16_t);
 	if (string_len > temp_ei->elem_len) {
-		fprintf(stderr, "%s: String to be encoded is longer - %d > %d\n",
-		       __func__, string_len, temp_ei->elem_len);
+		LOGW("%s: String to be encoded is longer - %d > %d\n",
+		     __func__, string_len, temp_ei->elem_len);
 		return -EINVAL;
 	}
 
 	if (enc_level == 1) {
 		if (string_len + TLV_LEN_SIZE + TLV_TYPE_SIZE >
 		    out_buf_len) {
-			fprintf(stderr, "%s: Output len %d > Out Buf len %d\n",
-			       __func__, string_len, out_buf_len);
+			LOGW("%s: Output len %d > Out Buf len %d\n",
+			     __func__, string_len, out_buf_len);
 			return -EINVAL;
 		}
 	} else {
 		if (string_len + string_len_sz > out_buf_len) {
-			fprintf(stderr, "%s: Output len %d > Out Buf len %d\n",
-			       __func__, string_len, out_buf_len);
+			LOGW("%s: Output len %d > Out Buf len %d\n",
+			     __func__, string_len, out_buf_len);
 			return -EINVAL;
 		}
 		rc = qmi_encode_basic_elem(buf_dst, &string_len,
@@ -362,7 +363,7 @@ static int qmi_encode(struct qmi_elem_info *ei_array, void *out_buf,
 			data_len_value = temp_ei->elem_len;
 		} else if (data_len_value <= 0 ||
 			    temp_ei->elem_len < data_len_value) {
-			fprintf(stderr, "%s: Invalid data length\n", __func__);
+			LOGW("%s: Invalid data length\n", __func__);
 			return -EINVAL;
 		}
 
@@ -383,7 +384,7 @@ static int qmi_encode(struct qmi_elem_info *ei_array, void *out_buf,
 			/* Check to avoid out of range buffer access */
 			if ((data_len_sz + encoded_bytes + TLV_LEN_SIZE +
 			    TLV_TYPE_SIZE) > out_buf_len) {
-				fprintf(stderr, "%s: Too Small Buffer @DATA_LEN\n",
+				LOGW("%s: Too Small Buffer @DATA_LEN\n",
 				       __func__);
 				return -EINVAL;
 			}
@@ -408,8 +409,8 @@ static int qmi_encode(struct qmi_elem_info *ei_array, void *out_buf,
 			if (((data_len_value * temp_ei->elem_size) +
 			    encoded_bytes + TLV_LEN_SIZE + TLV_TYPE_SIZE) >
 			    out_buf_len) {
-				fprintf(stderr, "%s: Too Small Buffer @data_type:%d\n",
-				       __func__, temp_ei->data_type);
+				LOGW("%s: Too Small Buffer @data_type:%d\n",
+				     __func__, temp_ei->data_type);
 				return -EINVAL;
 			}
 			rc = qmi_encode_basic_elem(buf_dst, buf_src,
@@ -443,7 +444,7 @@ static int qmi_encode(struct qmi_elem_info *ei_array, void *out_buf,
 						encode_tlv, rc);
 			break;
 		default:
-			fprintf(stderr, "%s: Unrecognized data type\n", __func__);
+			LOGW("%s: Unrecognized data type\n", __func__);
 			return -EINVAL;
 		}
 
@@ -527,9 +528,9 @@ static int qmi_decode_struct_elem(struct qmi_elem_info *ei_array,
 
 	if ((dec_level <= 2 && decoded_bytes != tlv_len) ||
 	    (dec_level > 2 && (i < elem_len || decoded_bytes > tlv_len))) {
-		fprintf(stderr, "%s: Fault in decoding: dl(%d), db(%d), tl(%d), i(%d), el(%d)\n",
-		       __func__, dec_level, decoded_bytes, tlv_len,
-		       i, elem_len);
+		LOGW("%s: Fault in decoding: dl(%d), db(%d), tl(%d), i(%d), el(%d)\n",
+		     __func__, dec_level, decoded_bytes, tlv_len,
+		     i, elem_len);
 		return -EFAULT;
 	}
 
@@ -574,12 +575,12 @@ static int qmi_decode_string_elem(struct qmi_elem_info *ei_array,
 	}
 
 	if (string_len > temp_ei->elem_len) {
-		fprintf(stderr, "%s: String len %d > Max Len %d\n",
-				__func__, string_len, temp_ei->elem_len);
+		LOGW("%s: String len %d > Max Len %d\n",
+		     __func__, string_len, temp_ei->elem_len);
 		return -EINVAL;
 	} else if (string_len > tlv_len) {
-		fprintf(stderr, "%s: String len %d > Input Buffer Len %d\n",
-		       __func__, string_len, tlv_len);
+		LOGW("%s: String len %d > Input Buffer Len %d\n",
+		     __func__, string_len, tlv_len);
 		return -EFAULT;
 	}
 
@@ -656,7 +657,7 @@ static int qmi_decode(struct qmi_elem_info *ei_array, void *out_c_struct,
 			decoded_bytes += (TLV_TYPE_SIZE + TLV_LEN_SIZE);
 			temp_ei = find_ei(ei_array, tlv_type);
 			if (!temp_ei && tlv_type < OPTIONAL_TLV_TYPE_START) {
-				fprintf(stderr, "%s: Inval element info\n", __func__);
+				LOGW("%s: Inval element info\n", __func__);
 				return -EINVAL;
 			} else if (!temp_ei) {
 				UPDATE_DECODE_VARIABLES(buf_src,
@@ -695,8 +696,8 @@ static int qmi_decode(struct qmi_elem_info *ei_array, void *out_c_struct,
 		} else if (temp_ei->array_type == STATIC_ARRAY) {
 			data_len_value = temp_ei->elem_len;
 		} else if (data_len_value > temp_ei->elem_len) {
-			fprintf(stderr, "%s: Data len %d > max spec %d\n",
-			       __func__, data_len_value, temp_ei->elem_len);
+			LOGW("%s: Data len %d > max spec %d\n",
+			     __func__, data_len_value, temp_ei->elem_len);
 			return -EINVAL;
 		}
 
@@ -731,7 +732,7 @@ static int qmi_decode(struct qmi_elem_info *ei_array, void *out_c_struct,
 			break;
 
 		default:
-			fprintf(stderr, "%s: Unrecognized data type\n", __func__);
+			LOGW("%s: Unrecognized data type\n", __func__);
 			return -EINVAL;
 		}
 		temp_ei = temp_ei + 1;
@@ -763,8 +764,8 @@ ssize_t qmi_encode_message(struct qrtr_packet *pkt, int type, int msg_id,
 	if (!c_struct) {
 		ret = qmi_calc_min_msg_len(ei, 1);
 		if (ret) {
-			fprintf(stderr, "%s: Calc. len %d != 0, but NULL c_struct\n",
-			       __func__, ret);
+			LOGW("%s: Calc. len %d != 0, but NULL c_struct\n",
+			     __func__, ret);
 			return -EINVAL;
 		}
 	}
@@ -796,7 +797,7 @@ int qmi_decode_header(struct qrtr_packet *pkt, unsigned int *msg_id)
 	struct qmi_header *qmi = pkt->data;
 
 	if (qmi->msg_len != pkt->data_len - sizeof(*qmi)) {
-		fprintf(stderr, "[RMTFS] Invalid length of incoming qmi request\n");
+		LOGW("[RMTFS] Invalid length of incoming qmi request\n");
 		return -EINVAL;
 	}
 
