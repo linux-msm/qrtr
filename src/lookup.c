@@ -1,17 +1,17 @@
+#include <err.h>
+#include <errno.h>
+#include <linux/qrtr.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
-#include <linux/qrtr.h>
 #include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include <errno.h>
-#include <err.h>
 
 #include "libqrtr.h"
-#include "util.h"
 #include "ns.h"
+#include "util.h"
 
 static const struct {
 	unsigned int service;
