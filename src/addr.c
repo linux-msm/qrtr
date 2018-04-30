@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include "libqrtr.h"
+#include "logging.h"
 
 void qrtr_set_address(uint32_t addr)
 {
@@ -31,11 +32,11 @@ void qrtr_set_address(uint32_t addr)
 	/* Trigger loading of the qrtr kernel module */
 	sock = socket(AF_QIPCRTR, SOCK_DGRAM, 0);
 	if (sock < 0)
-		err(1, "failed to create AF_QIPCRTR socket");
+		PLOGE_AND_EXIT("failed to create AF_QIPCRTR socket");
 
 	ret = getsockname(sock, (void*)&sq, &sl);
 	if (ret < 0)
-		err(1, "getsockname()");
+		PLOGE_AND_EXIT("getsockname()");
 	close(sock);
 
 	/* Skip configuring the address, if it's same as current */
@@ -44,7 +45,7 @@ void qrtr_set_address(uint32_t addr)
 
 	sock = socket(AF_NETLINK, SOCK_DGRAM, NETLINK_ROUTE);
 	if (sock < 0)
-		err(1, "failed to create netlink socket");
+		PLOGE_AND_EXIT("failed to create netlink socket");
 
 	memset(&req, 0, sizeof(req));
 	req.nh.nlmsg_len = NLMSG_SPACE(sizeof(struct ifaddrmsg));
@@ -61,15 +62,15 @@ void qrtr_set_address(uint32_t addr)
 
 	ret = send(sock, &req, req.nh.nlmsg_len, 0);
 	if (ret < 0)
-		err(1, "failed to send netlink request");
+		PLOGE_AND_EXIT("failed to send netlink request");
 
 	ret = recv(sock, &resp, sizeof(resp), 0);
 	if (ret < 0)
-		err(1, "failed to receive netlink response");
+		PLOGE_AND_EXIT("failed to receive netlink response");
 
 	if (resp.nh.nlmsg_type == NLMSG_ERROR && resp.err.error != 0) {
 		errno = -resp.err.error;
-		err(1, "failed to configure node id");
+		PLOGE_AND_EXIT("failed to configure node id");
 	}
 
 	close(sock);

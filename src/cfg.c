@@ -14,6 +14,7 @@
 
 #include "addr.h"
 #include "libqrtr.h"
+#include "logging.h"
 
 static void usage(const char *progname)
 {
@@ -27,6 +28,8 @@ int main(int argc, char **argv)
 	uint32_t addr;
 	char *ep;
 	const char *progname = basename(argv[0]);
+
+	qlog_setup(progname);
 
 	if (argc != 2)
 		usage(progname);

@@ -10,11 +10,8 @@
 #include <poll.h>
 
 #include "libqrtr.h"
+#include "logging.h"
 #include "ns.h"
-
-#define LOGW(fmt, ...) do { fprintf(stderr, "W|qrtr: " fmt "\n", ##__VA_ARGS__); } while (0)
-#define LOGE(fmt, ...) do { fprintf(stderr, "E|qrtr: " fmt "\n", ##__VA_ARGS__); } while (0)
-#define LOGE_errno(fmt, ...) do { fprintf(stderr, "E|qrtr: " fmt ": %s\n", ##__VA_ARGS__, strerror(errno)); } while (0)
 
 static int qrtr_getname(int sock, struct sockaddr_qrtr *sq)
 {
@@ -23,7 +20,7 @@ static int qrtr_getname(int sock, struct sockaddr_qrtr *sq)
 
 	rc = getsockname(sock, (void *)sq, &sl);
 	if (rc) {
-		LOGE_errno("getsockname()");
+		PLOGE("getsockname()");
 		return -1;
 	}
 
@@ -41,7 +38,7 @@ int qrtr_open(int rport)
 
 	sock = socket(AF_QIPCRTR, SOCK_DGRAM, 0);
 	if (sock < 0) {
-		LOGE_errno("socket(AF_QIPCRTR)");
+		PLOGE("socket(AF_QIPCRTR)");
 		return -1;
 	}
 
@@ -50,7 +47,7 @@ int qrtr_open(int rport)
 
 	rc = setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 	if (rc) {
-		LOGE_errno("setsockopt(SO_RCVTIMEO)");
+		PLOGE("setsockopt(SO_RCVTIMEO)");
 		goto err;
 	}
 
@@ -63,7 +60,7 @@ int qrtr_open(int rport)
 
 		rc = bind(sock, (void *)&sq, sizeof(sq));
 		if (rc < 0) {
-			LOGE_errno("bind(%d)", rport);
+			PLOGE("bind(%d)", rport);
 			goto err;
 		}
 	}
@@ -90,7 +87,7 @@ int qrtr_sendto(int sock, uint32_t node, uint32_t port, const void *data, unsign
 
 	rc = sendto(sock, data, sz, 0, (void *)&sq, sizeof(sq));
 	if (rc < 0) {
-		LOGE_errno("sendto()");
+		PLOGE("sendto()");
 		return -1;
 	}
 
@@ -196,7 +193,7 @@ int qrtr_recv(int sock, void *buf, unsigned int bsz)
 
 	rc = recv(sock, buf, bsz, 0);
 	if (rc < 0)
-		LOGE_errno("recv()");
+		PLOGE("recv()");
 	return rc;
 }
 
@@ -209,7 +206,7 @@ int qrtr_recvfrom(int sock, void *buf, unsigned int bsz, uint32_t *node, uint32_
 	sl = sizeof(sq);
 	rc = recvfrom(sock, buf, bsz, 0, (void *)&sq, &sl);
 	if (rc < 0) {
-		LOGE_errno("recvfrom()");
+		PLOGE("recvfrom()");
 		return rc;
 	}
 	if (node)
