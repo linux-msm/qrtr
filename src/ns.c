@@ -1,5 +1,6 @@
 #include <err.h>
 #include <errno.h>
+#include <libgen.h>
 #include <limits.h>
 #include <linux/qrtr.h>
 #include <linux/netlink.h>
@@ -746,11 +747,9 @@ static void qrtr_set_address(uint32_t addr)
 	close(sock);
 }
 
-static void usage(void)
+static void usage(const char *progname)
 {
-	extern char *__progname;
-
-	fprintf(stderr, "%s [-f] [<node-id>]\n", __progname);
+	fprintf(stderr, "%s [-f] [<node-id>]\n", progname);
 	exit(1);
 }
 
@@ -766,6 +765,7 @@ int main(int argc, char **argv)
 	char *ep;
 	int opt;
 	int rc;
+	const char *progname = basename(argv[0]);
 
 	while ((opt = getopt(argc, argv, "f")) != -1) {
 		switch (opt) {
@@ -773,21 +773,21 @@ int main(int argc, char **argv)
 			foreground = true;
 			break;
 		default:
-			usage();
+			usage(progname);
 		}
 	}
 
 	if (optind < argc) {
 		addr = strtoul(argv[optind], &ep, 10);
 		if (argv[1][0] == '\0' || *ep != '\0' || addr >= UINT_MAX)
-			usage();
+			usage(progname);
 
 		qrtr_set_address(addr);
 		optind++;
 	}
 
 	if (optind != argc)
-		usage();
+		usage(progname);
 
 	w = waiter_create();
 	if (w == NULL)
