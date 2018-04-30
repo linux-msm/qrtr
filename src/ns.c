@@ -1,24 +1,24 @@
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <linux/qrtr.h>
-#include <linux/netlink.h>
-#include <linux/rtnetlink.h>
-#include <unistd.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
 #include <err.h>
 #include <errno.h>
 #include <limits.h>
+#include <linux/qrtr.h>
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
-#include "map.h"
 #include "hash.h"
-#include "waiter.h"
 #include "list.h"
-#include "util.h"
+#include "map.h"
 #include "ns.h"
+#include "util.h"
+#include "waiter.h"
 
 #include "libqrtr.h"
 
