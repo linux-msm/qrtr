@@ -17,11 +17,13 @@ endif
 SFLAGS := -I$(shell $(CC) -print-file-name=include) -Wno-non-pointer-null
 
 $(proj)-cfg-srcs := \
-	src/cfg.c
+	src/addr.c \
+	src/cfg.c \
 
 $(proj)-cfg-cflags := -Ilib
 
 $(proj)-ns-srcs := \
+	src/addr.c \
 	src/ns.c \
 	src/map.c \
 	src/hash.c \
