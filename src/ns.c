@@ -687,7 +687,7 @@ static void node_mi_free(struct map_item *mi)
 
 static void usage(const char *progname)
 {
-	fprintf(stderr, "%s [-f] [<node-id>]\n", progname);
+	fprintf(stderr, "%s [-f] [-s] [<node-id>]\n", progname);
 	exit(1);
 }
 
@@ -700,22 +700,26 @@ int main(int argc, char **argv)
 	struct waiter *w;
 	socklen_t sl = sizeof(sq);
 	bool foreground = false;
+	bool use_syslog = false;
 	char *ep;
 	int opt;
 	int rc;
 	const char *progname = basename(argv[0]);
 
-	qlog_setup(progname, false);
-
-	while ((opt = getopt(argc, argv, "f")) != -1) {
+	while ((opt = getopt(argc, argv, "fs")) != -1) {
 		switch (opt) {
 		case 'f':
 			foreground = true;
+			break;
+		case 's':
+			use_syslog = true;
 			break;
 		default:
 			usage(progname);
 		}
 	}
+
+	qlog_setup(progname, use_syslog);
 
 	if (optind < argc) {
 		addr = strtoul(argv[optind], &ep, 10);
