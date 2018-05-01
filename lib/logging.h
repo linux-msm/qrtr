@@ -1,6 +1,7 @@
 #ifndef _QRTR_LOGGING_H_
 #define _QRTR_LOGGING_H_
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <syslog.h>
 
@@ -10,7 +11,7 @@
 #define __PRINTF__(fmt, args)
 #endif
 
-void qlog_setup(const char *tag);
+void qlog_setup(const char *tag, bool use_syslog);
 
 void qlog(int priority, const char *format, ...) __PRINTF__(2, 3);
 

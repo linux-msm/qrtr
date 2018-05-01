@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <syslog.h>
@@ -7,9 +8,12 @@
 static const char default_tag[] = "libqrtr";
 static const char *current_tag = default_tag;
 
-void qlog_setup(const char *tag)
+static bool logging_to_syslog = false;
+
+void qlog_setup(const char *tag, bool use_syslog)
 {
 	current_tag = tag;
+	logging_to_syslog = use_syslog;
 }
 
 static const char *get_priority_string(int priority)
@@ -37,13 +41,18 @@ static const char *get_priority_string(int priority)
 
 void qlog(int priority, const char *format, ...)
 {
-	char buf[QLOG_BUF_SIZE];
 	va_list ap;
-
 	va_start(ap, format);
-	vsnprintf(buf, QLOG_BUF_SIZE, format, ap);
-	va_end(ap);
 
-	fprintf(stderr, "%s %s: %s\n",
-	        get_priority_string(priority), current_tag, buf);
+	if (logging_to_syslog) {
+		vsyslog(priority, format, ap);
+	} else {
+		char buf[QLOG_BUF_SIZE];
+		vsnprintf(buf, QLOG_BUF_SIZE, format, ap);
+
+		fprintf(stderr, "%s %s: %s\n",
+		        get_priority_string(priority), current_tag, buf);
+	}
+
+	va_end(ap);
 }

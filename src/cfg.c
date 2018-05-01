@@ -29,7 +29,7 @@ int main(int argc, char **argv)
 	char *ep;
 	const char *progname = basename(argv[0]);
 
-	qlog_setup(progname);
+	qlog_setup(progname, false);
 
 	if (argc != 2)
 		usage(progname);

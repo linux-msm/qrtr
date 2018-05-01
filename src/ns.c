@@ -705,7 +705,7 @@ int main(int argc, char **argv)
 	int rc;
 	const char *progname = basename(argv[0]);
 
-	qlog_setup(progname);
+	qlog_setup(progname, false);
 
 	while ((opt = getopt(argc, argv, "f")) != -1) {
 		switch (opt) {
