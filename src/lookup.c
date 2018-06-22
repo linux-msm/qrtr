@@ -37,7 +37,7 @@ static const struct {
 	{ 14, 0, "Remote file system service" },
 	{ 15, 0, "Test service" },
 	{ 16, 0, "Location service (~ PDS v2)" },
-	{ 17, 0, "Service access proxy service" },
+	{ 17, 0, "Specific absorption rate service" },
 	{ 18, 0, "IMS settings service" },
 	{ 19, 0, "Analog to digital converter driver service" },
 	{ 20, 0, "Core sound driver service" },
