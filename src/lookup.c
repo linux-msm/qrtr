@@ -64,6 +64,7 @@ static const struct {
 	{ 43, 0, "Subsystem control service" },
 	{ 49, 0, "IPA control service" },
 	{ 51, 0, "CoreSight remote tracing service" },
+	{ 52, 0, "Dynamic Heap Memory Sharing" },
 	{ 64, 0, "Service registry locator service" },
 	{ 66, 0, "Service registry notification service" },
 	{ 69, 0, "ATH10k WLAN firmware service" },
