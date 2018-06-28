@@ -6,6 +6,10 @@
 #include <sys/socket.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef offsetof
 #define offsetof(type, md) ((unsigned long)&((type *)0)->md)
 #endif
@@ -182,4 +186,9 @@ struct qrtr_ctrl_pkt {
 } __attribute__((packed));
 
 #endif
+
+#ifdef __cplusplus
+}  /* extern "C" */
+#endif
+
 #endif
