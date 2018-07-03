@@ -266,6 +266,7 @@ int waiter_wait_timeout(struct waiter *w, unsigned int ms)
 	struct waiter_ticket ticket;
 	int rc;
 
+	memset(&ticket, 0, sizeof(ticket));
 	waiter_ticket_set_timeout(&ticket, ms);
 	list_append(&w->tickets, &ticket.list_item);
 	w->count++;
