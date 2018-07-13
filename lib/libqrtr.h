@@ -139,7 +139,7 @@ int qrtr_poll(int sock, unsigned int ms);
 int qrtr_decode(struct qrtr_packet *dest, void *buf, size_t len,
 		const struct sockaddr_qrtr *sq);
 
-int qmi_decode_header(struct qrtr_packet *pkt, unsigned int *msg_id);
+int qmi_decode_header(const struct qrtr_packet *pkt, unsigned int *msg_id);
 int qmi_decode_message(void *c_struct, unsigned int *txn,
 		       const struct qrtr_packet *pkt,
 		       int type, int id, struct qmi_elem_info *ei);

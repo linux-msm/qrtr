@@ -792,9 +792,9 @@ ssize_t qmi_encode_message(struct qrtr_packet *pkt, int type, int msg_id,
 	return pkt->data_len;
 }
 
-int qmi_decode_header(struct qrtr_packet *pkt, unsigned int *msg_id)
+int qmi_decode_header(const struct qrtr_packet *pkt, unsigned int *msg_id)
 {
-	struct qmi_header *qmi = pkt->data;
+	const struct qmi_header *qmi = pkt->data;
 
 	if (qmi->msg_len != pkt->data_len - sizeof(*qmi)) {
 		LOGW("[RMTFS] Invalid length of incoming qmi request\n");
