@@ -403,6 +403,7 @@ static int qmi_encode(struct qmi_elem_info *ei_array, void *out_buf,
 		case QMI_UNSIGNED_2_BYTE:
 		case QMI_UNSIGNED_4_BYTE:
 		case QMI_UNSIGNED_8_BYTE:
+		case QMI_SIGNED_1_BYTE_ENUM:
 		case QMI_SIGNED_2_BYTE_ENUM:
 		case QMI_SIGNED_4_BYTE_ENUM:
 			/* Check to avoid out of range buffer access */
@@ -706,6 +707,7 @@ static int qmi_decode(struct qmi_elem_info *ei_array, void *out_c_struct,
 		case QMI_UNSIGNED_2_BYTE:
 		case QMI_UNSIGNED_4_BYTE:
 		case QMI_UNSIGNED_8_BYTE:
+		case QMI_SIGNED_1_BYTE_ENUM:
 		case QMI_SIGNED_2_BYTE_ENUM:
 		case QMI_SIGNED_4_BYTE_ENUM:
 			rc = qmi_decode_basic_elem(buf_dst, buf_src,
