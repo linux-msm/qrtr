@@ -106,7 +106,7 @@ int qrtr_new_server(int sock, uint32_t service, uint16_t version, uint16_t insta
 
 	pkt.cmd = cpu_to_le32(QRTR_TYPE_NEW_SERVER);
 	pkt.server.service = cpu_to_le32(service);
-	pkt.server.instance = cpu_to_le32(instance << 16 | version);
+	pkt.server.instance = cpu_to_le32(instance << 8 | version);
 
 	return qrtr_sendto(sock, sq.sq_node, QRTR_PORT_CTRL, &pkt, sizeof(pkt));
 }
@@ -123,7 +123,7 @@ int qrtr_remove_server(int sock, uint32_t service, uint16_t version, uint16_t in
 
 	pkt.cmd = cpu_to_le32(QRTR_TYPE_DEL_SERVER);
 	pkt.server.service = cpu_to_le32(service);
-	pkt.server.instance = cpu_to_le32(instance << 16 | version);
+	pkt.server.instance = cpu_to_le32(instance << 8 | version);
 	pkt.server.node = cpu_to_le32(sq.sq_node);
 	pkt.server.port = cpu_to_le32(sq.sq_port);
 
@@ -152,7 +152,7 @@ int qrtr_new_lookup(int sock, uint32_t service, uint16_t version, uint16_t insta
 
 	pkt.cmd = cpu_to_le32(QRTR_TYPE_NEW_LOOKUP);
 	pkt.server.service = cpu_to_le32(service);
-	pkt.server.instance = cpu_to_le32(instance << 16 | version);
+	pkt.server.instance = cpu_to_le32(instance << 8 | version);
 
 	return qrtr_sendto(sock, sq.sq_node, QRTR_PORT_CTRL, &pkt, sizeof(pkt));
 }
@@ -169,7 +169,7 @@ int qrtr_remove_lookup(int sock, uint32_t service, uint16_t version, uint16_t in
 
 	pkt.cmd = cpu_to_le32(QRTR_TYPE_DEL_LOOKUP);
 	pkt.server.service = cpu_to_le32(service);
-	pkt.server.instance = cpu_to_le32(instance << 16 | version);
+	pkt.server.instance = cpu_to_le32(instance << 8 | version);
 	pkt.server.node = cpu_to_le32(sq.sq_node);
 	pkt.server.port = cpu_to_le32(sq.sq_port);
 
@@ -239,8 +239,8 @@ int qrtr_decode(struct qrtr_packet *dest, void *buf, size_t len,
 			dest->node = le32_to_cpu(ctrl->server.node);
 			dest->port = le32_to_cpu(ctrl->server.port);
 			dest->service = le32_to_cpu(ctrl->server.service);
-			dest->version = le32_to_cpu(ctrl->server.instance) & 0xffff;
-			dest->instance = le32_to_cpu(ctrl->server.instance) >> 16;
+			dest->version = le32_to_cpu(ctrl->server.instance) & 0xff;
+			dest->instance = le32_to_cpu(ctrl->server.instance) >> 8;
 			break;
 		default:
 			dest->type = 0;
