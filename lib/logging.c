@@ -7,6 +7,7 @@
 
 static const char default_tag[] = "libqrtr";
 static const char *current_tag = default_tag;
+static int min_priority = LOG_INFO;
 
 static bool logging_to_syslog = false;
 
@@ -14,6 +15,16 @@ void qlog_setup(const char *tag, bool use_syslog)
 {
 	current_tag = tag;
 	logging_to_syslog = use_syslog;
+
+	openlog(tag, LOG_PID, LOG_USER);
+}
+
+void qlog_set_min_priority(int priority)
+{
+	if (priority < LOG_EMERG || priority > LOG_DEBUG)
+		return;
+
+	min_priority = priority;
 }
 
 static const char *get_priority_string(int priority)
@@ -42,6 +53,10 @@ static const char *get_priority_string(int priority)
 void qlog(int priority, const char *format, ...)
 {
 	va_list ap;
+
+	if (priority > min_priority)
+		return;
+
 	va_start(ap, format);
 
 	if (logging_to_syslog) {

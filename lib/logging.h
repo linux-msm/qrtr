@@ -12,8 +12,11 @@
 #endif
 
 void qlog_setup(const char *tag, bool use_syslog);
+void qlog_set_min_priority(int priority);
 
 void qlog(int priority, const char *format, ...) __PRINTF__(2, 3);
+
+#define LOGD(fmt, ...) qlog(LOG_DEBUG, fmt, ##__VA_ARGS__)
 
 #define LOGW(fmt, ...) qlog(LOG_WARNING, fmt, ##__VA_ARGS__)
 #define PLOGW(fmt, ...) \
