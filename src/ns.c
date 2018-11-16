@@ -38,7 +38,6 @@ static const char *ctrl_pkt_strings[] = {
 	[QRTR_TYPE_DEL_LOOKUP]	= "del-lookup",
 };
 
-#define dprintf(...)
 #define ARRAY_SIZE(x) (sizeof(x)/sizeof((x)[0]))
 
 struct context {
@@ -160,7 +159,7 @@ static int service_announce_new(struct context *ctx,
 	struct qrtr_ctrl_pkt cmsg;
 	int rc;
 
-	dprintf("advertising new server [%d:%x]@[%d:%d]\n",
+	LOGD("advertising new server [%d:%x]@[%d:%d]\n",
 		srv->service, srv->instance, srv->node, srv->port);
 
 	cmsg.cmd = cpu_to_le32(QRTR_TYPE_NEW_SERVER);
@@ -172,7 +171,7 @@ static int service_announce_new(struct context *ctx,
 	rc = sendto(ctx->sock, &cmsg, sizeof(cmsg), 0,
 		    (struct sockaddr *)dest, sizeof(*dest));
 	if (rc < 0)
-		warn("sendto()");
+		PLOGW("sendto()");
 
 	return rc;
 }
@@ -184,7 +183,7 @@ static int service_announce_del(struct context *ctx,
 	struct qrtr_ctrl_pkt cmsg;
 	int rc;
 
-	dprintf("advertising removal of server [%d:%x]@[%d:%d]\n",
+	LOGD("advertising removal of server [%d:%x]@[%d:%d]\n",
 		srv->service, srv->instance, srv->node, srv->port);
 
 	cmsg.cmd = cpu_to_le32(QRTR_TYPE_DEL_SERVER);
@@ -196,7 +195,7 @@ static int service_announce_del(struct context *ctx,
 	rc = sendto(ctx->sock, &cmsg, sizeof(cmsg), 0,
 		    (struct sockaddr *)dest, sizeof(*dest));
 	if (rc < 0)
-		warn("sendto()");
+		PLOGW("sendto()");
 
 	return rc;
 }
@@ -218,7 +217,7 @@ static int lookup_notify(struct context *ctx, struct sockaddr_qrtr *to,
 	rc = sendto(ctx->sock, &pkt, sizeof(pkt), 0,
 		    (struct sockaddr *)to, sizeof(*to));
 	if (rc < 0)
-		warn("send lookup result failed");
+		PLOGW("send lookup result failed");
 	return rc;
 }
 
@@ -272,8 +271,8 @@ static struct server *server_add(unsigned int service, unsigned int instance,
 	if (rc)
 		goto err;
 
-	dprintf("add server [%d:%x]@[%d:%d]\n", srv->service, srv->instance,
-			srv->node, srv->port);
+	LOGD("add server [%d:%x]@[%d:%d]\n", srv->service, srv->instance,
+		srv->node, srv->port);
 
 	if (mi) { /* we replaced someone */
 		struct server *old = container_of(mi, struct server, mi);
@@ -372,7 +371,7 @@ static int ctrl_cmd_bye(struct context *ctx, struct sockaddr_qrtr *from)
 		rc = sendto(ctx->sock, &pkt, sizeof(pkt), 0,
 				(struct sockaddr *)&sq, sizeof(sq));
 		if (rc < 0)
-			warn("bye propagation failed");
+			PLOGW("bye propagation failed");
 	}
 
 	return 0;
@@ -436,7 +435,7 @@ static int ctrl_cmd_del_client(struct context *ctx, struct sockaddr_qrtr *from,
 		rc = sendto(ctx->sock, &pkt, sizeof(pkt), 0,
 				(struct sockaddr *)&sq, sizeof(sq));
 		if (rc < 0)
-			warn("del_client propagation failed");
+			PLOGW("del_client propagation failed");
 	}
 
 	return 0;
@@ -586,7 +585,7 @@ static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 	sl = sizeof(sq);
 	len = recvfrom(sock, buf, sizeof(buf), 0, (void *)&sq, &sl);
 	if (len <= 0) {
-		warn("recvfrom()");
+		PLOGW("recvfrom()");
 		close(sock);
 		ctx->sock = -1;
 		goto out;
@@ -594,15 +593,15 @@ static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 	msg = (void *)buf;
 
 	if (len < 4) {
-		warnx("short packet from %d:%d", sq.sq_node, sq.sq_port);
+		LOGW("short packet from %d:%d", sq.sq_node, sq.sq_port);
 		goto out;
 	}
 
 	cmd = le32_to_cpu(msg->cmd);
 	if (cmd < ARRAY_SIZE(ctrl_pkt_strings) && ctrl_pkt_strings[cmd])
-		dprintf("%s from %d:%d\n", ctrl_pkt_strings[cmd], sq.sq_node, sq.sq_port);
+		LOGD("%s from %d:%d\n", ctrl_pkt_strings[cmd], sq.sq_node, sq.sq_port);
 	else
-		dprintf("UNK (%08x) from %d:%d\n", cmd, sq.sq_node, sq.sq_port);
+		LOGD("UNK (%08x) from %d:%d\n", cmd, sq.sq_node, sq.sq_port);
 
 	rc = 0;
 	switch (cmd) {
@@ -648,7 +647,7 @@ static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 	}
 
 	if (rc < 0)
-		warnx("failed while handling packet from %d:%d",
+		LOGW("failed while handling packet from %d:%d",
 		      sq.sq_node, sq.sq_port);
 out:
 	waiter_ticket_clear(tkt);
@@ -701,12 +700,13 @@ int main(int argc, char **argv)
 	socklen_t sl = sizeof(sq);
 	bool foreground = false;
 	bool use_syslog = false;
+	bool verbose_log = false;
 	char *ep;
 	int opt;
 	int rc;
 	const char *progname = basename(argv[0]);
 
-	while ((opt = getopt(argc, argv, "fs")) != -1) {
+	while ((opt = getopt(argc, argv, "fsv")) != -1) {
 		switch (opt) {
 		case 'f':
 			foreground = true;
@@ -714,12 +714,17 @@ int main(int argc, char **argv)
 		case 's':
 			use_syslog = true;
 			break;
+		case 'v':
+			verbose_log = true;
+			break;
 		default:
 			usage(progname);
 		}
 	}
 
 	qlog_setup(progname, use_syslog);
+	if (verbose_log)
+		qlog_set_min_priority(LOG_DEBUG);
 
 	if (optind < argc) {
 		addr = strtoul(argv[optind], &ep, 10);
