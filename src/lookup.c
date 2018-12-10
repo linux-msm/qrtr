@@ -15,6 +15,8 @@
 #include "ns.h"
 #include "util.h"
 
+#define DIAG_SERVICE 4097
+
 static const struct {
 	unsigned int service;
 	unsigned int ifilter;
@@ -74,8 +76,40 @@ static const struct {
 	{ 312, 0, "QBT1000 Ultrasonic Fingerprint Sensor service" },
 	{ 769, 0, "SLIMbus control service" },
 	{ 771, 0, "Peripheral Access Control Manager service" },
-	{ 4097, 0, "DIAG service" },
+	{ DIAG_SERVICE, 0, "DIAG service" },
 };
+
+static const char *diag_instance_base_str(unsigned int instance_base)
+{
+	switch (instance_base) {
+		case 0: return "MODEM";
+		case 1: return "LPASS";
+		case 2: return "WCNSS";
+		case 3: return "SENSORS";
+		case 4: return "CDSP";
+		case 5: return "WDSP";
+		default: return "<unk>";
+	}
+}
+
+static const char *diag_instance_str(unsigned int instance)
+{
+	switch (instance) {
+		case 0: return "CNTL";
+		case 1: return "CMD";
+		case 2: return "DATA";
+		case 3: return "DCI_CMD";
+		case 4: return "DCI";
+		default: return "<unk>";
+	}
+}
+
+static int get_diag_instance_info(char *str, size_t size, unsigned int instance)
+{
+	return snprintf(str, size, "%s:%s",
+			diag_instance_base_str(instance >> 6),
+			diag_instance_str(instance & 0x3f));
+}
 
 static unsigned int read_num_le(const char *str, int *rcp)
 {
@@ -179,14 +213,19 @@ int main(int argc, char **argv)
 				continue;
 			name = common_names[i].name;
 		}
+		if (!name)
+			name = "<unknown>";
 
-		printf("%9d %7d %8d %4d %5d %s\n",
-				service,
-				version,
-				instance,
-				node,
-				port,
-				name ? name : "<unknown>");
+		if (service == DIAG_SERVICE) {
+			char buf[24];
+			instance = le32_to_cpu(pkt.server.instance);
+			get_diag_instance_info(buf, sizeof(buf), instance);
+			printf("%9d %7s %8d %4d %5d %s (%s)\n",
+				service, "N/A", instance, node, port, name, buf);
+		} else {
+			printf("%9d %7d %8d %4d %5d %s\n",
+				service, version, instance, node, port, name);
+		}
 	}
 
 	if (len < 0)
