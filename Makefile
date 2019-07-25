@@ -10,6 +10,7 @@ prefix := /usr/local
 bindir := $(prefix)/bin
 libdir := $(prefix)/lib
 includedir := $(prefix)/include
+servicedir := $(prefix)/lib/systemd/system
 
 ifneq ($(CROSS_COMPILE),)
 CC := $(CROSS_COMPILE)gcc
@@ -119,9 +120,21 @@ $(DESTDIR)$(libdir)/$1.$(proj-version): $1
 all-install += $(DESTDIR)$(libdir)/$1.$(proj-version)
 endef
 
+define add-systemd-service-target
+$1: $1.in
+	sed 's+QRTR_NS_PATH+$(bindir)+g' $$< > $$@
+
+$(DESTDIR)$(servicedir)/$1: $1
+	@echo "INSTALL	$$<"
+	@install -D -m 755 $$< $$@
+
+all-install += $(DESTDIR)$(servicedir)/$1
+endef
+
 $(foreach v,$(filter-out %.so,$(targets)),$(eval $(call add-bin-target,$v)))
 $(foreach v,$(filter %.so,$(targets)),$(eval $(call add-lib-target,$v)))
 $(eval $(call add-inc-target,lib,libqrtr.h))
+$(eval $(call add-systemd-service-target,qrtr-ns.service))
 
 install: $(all-install)
 
