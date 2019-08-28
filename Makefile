@@ -126,7 +126,7 @@ $1: $1.in
 
 $(DESTDIR)$(servicedir)/$1: $1
 	@echo "INSTALL	$$<"
-	@install -D -m 755 $$< $$@
+	@install -D -m 644 $$< $$@
 
 all-install += $(DESTDIR)$(servicedir)/$1
 endef
