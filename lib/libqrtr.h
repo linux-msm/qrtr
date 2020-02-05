@@ -4,6 +4,7 @@
 #include <linux/qrtr.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -11,7 +12,7 @@ extern "C" {
 #endif
 
 #ifndef offsetof
-#define offsetof(type, md) ((unsigned long)&((type *)0)->md)
+#define offsetof(type, md) ((size_t)&((type *)0)->md)
 #endif
 
 #ifndef container_of
@@ -90,7 +91,7 @@ struct qmi_elem_info {
 	uint32_t elem_size;
 	enum qmi_array_type array_type;
 	uint8_t tlv_type;
-	uint32_t offset;
+	size_t offset;
 	struct qmi_elem_info *ei_array;
 };
 
