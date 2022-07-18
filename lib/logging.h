@@ -38,7 +38,7 @@ void qlog(int priority, const char *format, ...) __PRINTF__(2, 3);
 	} while(0)
 
 #ifdef __cplusplus
-extern "C" {
+}
 #endif
 
 #endif
