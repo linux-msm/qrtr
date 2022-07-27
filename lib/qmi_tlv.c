@@ -43,7 +43,6 @@ struct qmi_tlv *qmi_tlv_init(uint16_t txn, uint32_t msg_id, uint32_t msg_type)
 
 struct qmi_tlv *qmi_tlv_decode(void *buf, size_t len)
 {
-	struct qmi_header *pkt = buf;
 	struct qmi_tlv *tlv;
 
 	tlv = malloc(sizeof(struct qmi_tlv));
@@ -247,13 +246,13 @@ void qmi_tlv_dump(struct qmi_tlv *tlv) {
 	char line[LINE_LENGTH * 4 + 1];
 
 	pkt = tlv->buf;
-	pkt_data = &pkt[1];
+	pkt_data = &pkt[0];
 
 	printf("<<< Message:\n");
 	printf("<<<    type    : %u\n", pkt->type);
-	printf("<<<    msg_len : %u\n", pkt->msg_len);
-	printf("<<<    msg_id  : 0x%04x\n", pkt->msg_id);
-	printf("<<<    txn_id  : %u\n", pkt->txn_id);
+	printf("<<<    msg_len : 0x%1$04x (%1$u)\n", pkt->msg_len);
+	printf("<<<    msg_id  : 0x%1$04x (%1$u)\n", pkt->msg_id);
+	printf("<<<    txn_id  : 0x%1$04x (%1$u)\n", pkt->txn_id);
 	printf("<<< TLVs:\n");
 	while (offset < tlv->size - sizeof(struct qmi_header)) {
 		item = pkt_data + offset;
