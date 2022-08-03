@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <errno.h>
 #include <string.h>
 #include <stdint.h>
@@ -227,7 +228,7 @@ struct qmi_response_type_v01 *qmi_tlv_get_result(struct qmi_tlv *tlv)
 }
 
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
-#define LINE_LENGTH 64
+#define LINE_LENGTH 40
 
 static inline uint8_t to_hex(uint8_t ch)
 {
@@ -238,7 +239,7 @@ static inline uint8_t to_hex(uint8_t ch)
 void qmi_tlv_dump(struct qmi_tlv *tlv) {
 	struct qmi_tlv_item *item;
 	struct qmi_header *pkt;
-	unsigned offset = 0;
+	unsigned offset = sizeof(struct qmi_header);
 	void *pkt_data;
 	int i = 0, li, j, k;
 	uint8_t ch;
@@ -254,10 +255,11 @@ void qmi_tlv_dump(struct qmi_tlv *tlv) {
 	printf("<<<    msg_id  : 0x%1$04x (%1$u)\n", pkt->msg_id);
 	printf("<<<    txn_id  : 0x%1$04x (%1$u)\n", pkt->txn_id);
 	printf("<<< TLVs:\n");
-	while (offset < tlv->size - sizeof(struct qmi_header)) {
+	// I do not understand why this -1 is needed
+	while (offset < tlv->size - 1) {
 		item = pkt_data + offset;
 		printf("<<< TLV %d: {id: 0x%02x, len: 0x%02x}\n", i, item->key, item->len);
-		if (item->len > pkt->msg_len - offset) {
+		if (item->len > pkt->msg_len + sizeof(struct qmi_header) - offset) {
 			fprintf(stderr, "Invalid item length!\n");
 			return;
 		}
@@ -271,6 +273,18 @@ void qmi_tlv_dump(struct qmi_tlv *tlv) {
 				line[li++] = to_hex(ch);
 				line[li++] = k < linelen - 1 ? ':' : ' ';
 			}
+
+			for (; k < LINE_LENGTH; k++) {
+				line[li++] = ' ';
+				line[li++] = ' ';
+				line[li++] = ' ';
+			}
+
+			for (k = 0; k < linelen; k++) {
+				ch = item->data[j + k];
+				line[li++] = isprint(ch) ? ch : '.';
+			}
+
 			line[li] = '\0';
 
 			printf("%s\n\n", line);

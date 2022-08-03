@@ -178,8 +178,17 @@ void *qmi_tlv_get_array(struct qmi_tlv *tlv, uint8_t id, size_t len_size,
 int qmi_tlv_set(struct qmi_tlv *tlv, uint8_t id, void *buf, size_t len);
 int qmi_tlv_set_array(struct qmi_tlv *tlv, uint8_t id, size_t len_size,
 		      void *buf, size_t len, size_t size);
-
 struct qmi_response_type_v01 *qmi_tlv_get_result(struct qmi_tlv *tlv);
+
+static inline int qmi_tlv_dump_buf(void *buf, size_t len) {
+	struct qmi_tlv *tlv = qmi_tlv_decode(buf, len);
+	if (!tlv)
+		return -1;
+	qmi_tlv_dump(tlv);
+	qmi_tlv_free(tlv);
+
+	return 0;
+}
 
 /* Initial kernel header didn't expose these */
 #ifndef QRTR_NODE_BCAST
