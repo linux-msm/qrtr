@@ -8,19 +8,6 @@
 
 #include "libqrtr.h"
 
-struct qmi_tlv {
-	void *allocated;
-	void *buf;
-	size_t size;
-	int error;
-};
-
-struct qmi_tlv_item {
-	uint8_t key;
-	uint16_t len;
-	uint8_t data[];
-} __attribute__((__packed__));
-
 struct qmi_tlv *qmi_tlv_init(uint16_t txn, uint32_t msg_id, uint32_t msg_type)
 {
 	struct qmi_header *pkt;
@@ -236,60 +223,4 @@ static inline uint8_t to_hex(uint8_t ch)
 	return ch <= 9 ? '0' + ch : 'a' + ch - 10;
 }
 
-void qmi_tlv_dump(struct qmi_tlv *tlv) {
-	struct qmi_tlv_item *item;
-	struct qmi_header *pkt;
-	unsigned offset = sizeof(struct qmi_header);
-	void *pkt_data;
-	int i = 0, li, j, k;
-	uint8_t ch;
-	size_t linelen;
-	char line[LINE_LENGTH * 4 + 1];
 
-	pkt = tlv->buf;
-	pkt_data = &pkt[0];
-
-	printf("<<< Message:\n");
-	printf("<<<    type    : %u\n", pkt->type);
-	printf("<<<    msg_len : 0x%1$04x (%1$u)\n", pkt->msg_len);
-	printf("<<<    msg_id  : 0x%1$04x (%1$u)\n", pkt->msg_id);
-	printf("<<<    txn_id  : 0x%1$04x (%1$u)\n", pkt->txn_id);
-	printf("<<< TLVs:\n");
-	// I do not understand why this -1 is needed
-	while (offset < tlv->size - 1) {
-		item = pkt_data + offset;
-		printf("<<< TLV %d: {id: 0x%02x, len: 0x%02x}\n", i, item->key, item->len);
-		if (item->len > pkt->msg_len + sizeof(struct qmi_header) - offset) {
-			fprintf(stderr, "Invalid item length!\n");
-			return;
-		}
-		for (j = 0; j < item->len; j += LINE_LENGTH) {
-			linelen = MIN(LINE_LENGTH, item->len - j);
-			li = 0;
-
-			for (k = 0; k < linelen; k++) {
-				ch = item->data[j + k];
-				line[li++] = to_hex(ch >> 4);
-				line[li++] = to_hex(ch);
-				line[li++] = k < linelen - 1 ? ':' : ' ';
-			}
-
-			for (; k < LINE_LENGTH; k++) {
-				line[li++] = ' ';
-				line[li++] = ' ';
-				line[li++] = ' ';
-			}
-
-			for (k = 0; k < linelen; k++) {
-				ch = item->data[j + k];
-				line[li++] = isprint(ch) ? ch : '.';
-			}
-
-			line[li] = '\0';
-
-			printf("%s\n\n", line);
-		}
-		offset += sizeof(struct qmi_tlv_item) + item->len;
-		i++;
-	}
-}
