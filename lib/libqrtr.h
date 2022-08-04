@@ -180,6 +180,11 @@ struct qmi_tlv_item {
 	uint8_t data[];
 } __attribute__((__packed__));
 
+struct qmi_tlv_msg_name {
+	int msg_id;
+	const char *msg_name;
+};
+
 struct qmi_tlv *qmi_tlv_init(uint16_t txn, uint32_t msg_id, uint32_t msg_type);
 void *qmi_tlv_encode(struct qmi_tlv *tlv, size_t *len);
 struct qmi_tlv *qmi_tlv_decode(void *buf, size_t len);
