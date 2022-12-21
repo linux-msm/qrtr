@@ -75,6 +75,7 @@ static const struct {
 	{ 225, 0, "Remote Management Service" },
 	{ 226, 0, "Open Mobile Alliance device management service" },
 	{ 312, 0, "QBT1000 Ultrasonic Fingerprint Sensor service" },
+	{ 400, 0, "Snapdragon Sensor Core service" },
 	{ 769, 0, "SLIMbus control service" },
 	{ 771, 0, "Peripheral Access Control Manager service" },
 	{ 4096, 0, "TFTP" },
