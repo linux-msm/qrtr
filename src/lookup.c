@@ -77,6 +77,7 @@ static const struct {
 	{ 312, 0, "QBT1000 Ultrasonic Fingerprint Sensor service" },
 	{ 400, 0, "Snapdragon Sensor Core service" },
 	{ 769, 0, "SLIMbus control service" },
+	{ 770, 0, "IMS data service" },
 	{ 771, 0, "Peripheral Access Control Manager service" },
 	{ 4096, 0, "TFTP" },
 	{ DIAG_SERVICE, 0, "DIAG service" },
