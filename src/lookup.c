@@ -236,10 +236,10 @@ int main(int argc, char **argv)
 			char buf[24];
 			instance = le32_to_cpu(pkt.server.instance);
 			get_diag_instance_info(buf, sizeof(buf), instance);
-			printf("%9d %7s %8d %4d %5d %s (%s)\n",
+			printf("%9u %s %8u %4u %5u %s (%s)\n",
 				service, "N/A", instance, node, port, name, buf);
 		} else {
-			printf("%9d %7d %8d %4d %5d %s\n",
+			printf("%9u %7u %8u %4u %5u %s\n",
 				service, version, instance, node, port, name);
 		}
 	}
