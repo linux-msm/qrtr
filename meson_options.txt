@@ -1,0 +1,4 @@
+option('systemd-unit-prefix',
+  type: 'string',
+  description: 'Directory for systemd system unit files'
+)

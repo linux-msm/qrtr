@@ -1,6 +1,7 @@
 #include <err.h>
 #include <errno.h>
 #include <libgen.h>
+#include <libqrtr.h>
 #include <linux/qrtr.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,7 +11,6 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include "libqrtr.h"
 #include "logging.h"
 #include "ns.h"
 #include "util.h"
