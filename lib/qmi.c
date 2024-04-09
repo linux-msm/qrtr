@@ -287,7 +287,7 @@ static int qmi_encode_string_elem(struct qmi_elem_info *ei_array,
 	string_len_sz = temp_ei->elem_len <= 256 ?
 			sizeof(uint8_t) : sizeof(uint16_t);
 	if (string_len > temp_ei->elem_len) {
-		LOGW("%s: String to be encoded is longer - %d > %d\n",
+		LOGW("%s: String to be encoded is longer - %u > %u\n",
 		     __func__, string_len, temp_ei->elem_len);
 		return -EINVAL;
 	}
@@ -295,13 +295,13 @@ static int qmi_encode_string_elem(struct qmi_elem_info *ei_array,
 	if (enc_level == 1) {
 		if (string_len + TLV_LEN_SIZE + TLV_TYPE_SIZE >
 		    out_buf_len) {
-			LOGW("%s: Output len %d > Out Buf len %d\n",
+			LOGW("%s: Output len %u > Out Buf len %u\n",
 			     __func__, string_len, out_buf_len);
 			return -EINVAL;
 		}
 	} else {
 		if (string_len + string_len_sz > out_buf_len) {
-			LOGW("%s: Output len %d > Out Buf len %d\n",
+			LOGW("%s: Output len %u > Out Buf len %u\n",
 			     __func__, string_len, out_buf_len);
 			return -EINVAL;
 		}
@@ -410,7 +410,7 @@ static int qmi_encode(struct qmi_elem_info *ei_array, void *out_buf,
 			if (((data_len_value * temp_ei->elem_size) +
 			    encoded_bytes + TLV_LEN_SIZE + TLV_TYPE_SIZE) >
 			    out_buf_len) {
-				LOGW("%s: Too Small Buffer @data_type:%d\n",
+				LOGW("%s: Too Small Buffer @data_type:%u\n",
 				     __func__, temp_ei->data_type);
 				return -EINVAL;
 			}
@@ -529,7 +529,7 @@ static int qmi_decode_struct_elem(struct qmi_elem_info *ei_array,
 
 	if ((dec_level <= 2 && decoded_bytes != tlv_len) ||
 	    (dec_level > 2 && (i < elem_len || decoded_bytes > tlv_len))) {
-		LOGW("%s: Fault in decoding: dl(%d), db(%d), tl(%d), i(%d), el(%d)\n",
+		LOGW("%s: Fault in decoding: dl(%d), db(%d), tl(%u), i(%d), el(%u)\n",
 		     __func__, dec_level, decoded_bytes, tlv_len,
 		     i, elem_len);
 		return -EFAULT;
@@ -576,11 +576,11 @@ static int qmi_decode_string_elem(struct qmi_elem_info *ei_array,
 	}
 
 	if (string_len > temp_ei->elem_len) {
-		LOGW("%s: String len %d > Max Len %d\n",
+		LOGW("%s: String len %u > Max Len %u\n",
 		     __func__, string_len, temp_ei->elem_len);
 		return -EINVAL;
 	} else if (string_len > tlv_len) {
-		LOGW("%s: String len %d > Input Buffer Len %d\n",
+		LOGW("%s: String len %u > Input Buffer Len %u\n",
 		     __func__, string_len, tlv_len);
 		return -EFAULT;
 	}
@@ -697,7 +697,7 @@ static int qmi_decode(struct qmi_elem_info *ei_array, void *out_c_struct,
 		} else if (temp_ei->array_type == STATIC_ARRAY) {
 			data_len_value = temp_ei->elem_len;
 		} else if (data_len_value > temp_ei->elem_len) {
-			LOGW("%s: Data len %d > max spec %d\n",
+			LOGW("%s: Data len %u > max spec %u\n",
 			     __func__, data_len_value, temp_ei->elem_len);
 			return -EINVAL;
 		}
