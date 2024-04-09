@@ -159,7 +159,7 @@ static int service_announce_new(struct context *ctx,
 	struct qrtr_ctrl_pkt cmsg;
 	int rc;
 
-	LOGD("advertising new server [%d:%x]@[%d:%d]\n",
+	LOGD("advertising new server [%u:%x]@[%u:%u]\n",
 		srv->service, srv->instance, srv->node, srv->port);
 
 	cmsg.cmd = cpu_to_le32(QRTR_TYPE_NEW_SERVER);
@@ -183,7 +183,7 @@ static int service_announce_del(struct context *ctx,
 	struct qrtr_ctrl_pkt cmsg;
 	int rc;
 
-	LOGD("advertising removal of server [%d:%x]@[%d:%d]\n",
+	LOGD("advertising removal of server [%u:%x]@[%u:%u]\n",
 		srv->service, srv->instance, srv->node, srv->port);
 
 	cmsg.cmd = cpu_to_le32(QRTR_TYPE_DEL_SERVER);
@@ -271,7 +271,7 @@ static struct server *server_add(unsigned int service, unsigned int instance,
 	if (rc)
 		goto err;
 
-	LOGD("add server [%d:%x]@[%d:%d]\n", srv->service, srv->instance,
+	LOGD("add server [%u:%x]@[%u:%u]\n", srv->service, srv->instance,
 		srv->node, srv->port);
 
 	if (mi) { /* we replaced someone */
@@ -593,15 +593,15 @@ static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 	msg = (void *)buf;
 
 	if (len < 4) {
-		LOGW("short packet from %d:%d", sq.sq_node, sq.sq_port);
+		LOGW("short packet from %u:%u", sq.sq_node, sq.sq_port);
 		goto out;
 	}
 
 	cmd = le32_to_cpu(msg->cmd);
 	if (cmd < ARRAY_SIZE(ctrl_pkt_strings) && ctrl_pkt_strings[cmd])
-		LOGD("%s from %d:%d\n", ctrl_pkt_strings[cmd], sq.sq_node, sq.sq_port);
+		LOGD("%s from %u:%u\n", ctrl_pkt_strings[cmd], sq.sq_node, sq.sq_port);
 	else
-		LOGD("UNK (%08x) from %d:%d\n", cmd, sq.sq_node, sq.sq_port);
+		LOGD("UNK (%08x) from %u:%u\n", cmd, sq.sq_node, sq.sq_port);
 
 	rc = 0;
 	switch (cmd) {
@@ -647,7 +647,7 @@ static void ctrl_port_fn(void *vcontext, struct waiter_ticket *tkt)
 	}
 
 	if (rc < 0)
-		LOGW("failed while handling packet from %d:%d",
+		LOGW("failed while handling packet from %u:%u",
 		      sq.sq_node, sq.sq_port);
 out:
 	waiter_ticket_clear(tkt);
