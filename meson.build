@@ -5,7 +5,7 @@ project('qrtr',
         license : [ 'BSD-3-Clause'],
         meson_version : '>= 0.64.0', # for feature user options
         default_options : [
-        #     'warning_level=2',	# sets -Wextra
+        'warning_level=1',
         'buildtype=release',
         ])
 
