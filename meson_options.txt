@@ -1,3 +1,9 @@
+option('qrtr-ns',
+  type: 'feature',
+  value: 'auto',
+  description: 'Whether or not to build the qrtr-ns binary'
+)
+
 option('systemd-unit-prefix',
   type: 'string',
   description: 'Directory for systemd system unit files'

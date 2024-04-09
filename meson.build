@@ -9,6 +9,7 @@ project('qrtr',
         ])
 
 prefix = get_option('prefix')
+with_qrtr_ns = get_option('qrtr-ns')
 
 install_systemd_unit = get_option('systemd-service')
 systemd = dependency('systemd', required : install_systemd_unit)
@@ -29,7 +30,7 @@ subdir('lib')
 subdir('include')
 subdir('src')
 
-if systemd.found()
+if systemd.found() and with_qrtr_ns.enabled()
         systemd_unit_conf = configuration_data()
         systemd_unit_conf.set('prefix', prefix)
         configure_file(
