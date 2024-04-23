@@ -2,6 +2,7 @@
 
 project('qrtr',
         'c',
+        version: '1.1',
         license : [ 'BSD-3-Clause'],
         default_options : [
         'warning_level=1',
