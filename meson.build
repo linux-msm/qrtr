@@ -3,6 +3,7 @@
 project('qrtr',
         'c',
         license : [ 'BSD-3-Clause'],
+        version : '1.1',
         default_options : [
         'warning_level=1',
         'buildtype=release',
