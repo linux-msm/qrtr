@@ -1,5 +1,6 @@
 #include <err.h>
 #include <errno.h>
+#include <libqrtr.h>
 #include <libgen.h>
 #include <limits.h>
 #include <linux/qrtr.h>
@@ -22,7 +23,6 @@
 #include "util.h"
 #include "waiter.h"
 
-#include "libqrtr.h"
 #include "logging.h"
 
 static const char *ctrl_pkt_strings[] = {

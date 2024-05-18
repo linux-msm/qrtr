@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <libqrtr.h>
 #include <linux/qrtr.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -9,7 +10,6 @@
 #include <errno.h>
 #include <poll.h>
 
-#include "libqrtr.h"
 #include "logging.h"
 #include "ns.h"
 

@@ -1,5 +1,6 @@
 #include <err.h>
 #include <errno.h>
+#include <libqrtr.h>
 #include <linux/qrtr.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
@@ -9,7 +10,6 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include "libqrtr.h"
 #include "logging.h"
 
 void qrtr_set_address(uint32_t addr)
