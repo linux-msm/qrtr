@@ -1,6 +1,7 @@
 #include <err.h>
 #include <errno.h>
 #include <libgen.h>
+#include <libqrtr.h>
 #include <limits.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
@@ -13,7 +14,6 @@
 #include <unistd.h>
 
 #include "addr.h"
-#include "libqrtr.h"
 #include "logging.h"
 
 static void usage(const char *progname)
