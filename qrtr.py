@@ -81,7 +81,7 @@ class qrtr:
         node = ctypes.c_int()
         port = ctypes.c_int()
         buf = ctypes.create_string_buffer(sz)
-        n = _qrtr.qrtr_recvfrom(self.sock, c_char_p(ctypes.addressof(buf)),
+        n = _qrtr.qrtr_recvfrom(self.sock, c_char_p(ctypes.addressof(buf)), sz,
                 ctypes.byref(node), ctypes.byref(port))
         if n <= 0:
             raise RuntimeError("recvfrom failed")
