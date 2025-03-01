@@ -86,6 +86,8 @@ static const struct {
 	{ 226, 0, "Open Mobile Alliance device management service" },
 	{ 231, 0, "Vendor-specific service" },
 	{ 235, 0, "Modem service" },
+	{ 256, 0, "Sensor Manager service" },
+	{ 271, 0, "Sensor Registry service" },
 	{ 312, 0, "QBT1000 Ultrasonic Fingerprint Sensor service" },
 	{ 400, 0, "Snapdragon Sensor Core service" },
 	{ 769, 0, "SLIMbus control service" },
