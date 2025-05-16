@@ -7,8 +7,8 @@ cc_library {
         "lib/qmi.c",
     ],
     cflags: ["-fPIC", "-Wno-error"],
-    export_include_dirs: ["lib"],
-    local_include_dirs: ["src"],
+    export_include_dirs: ["include", "lib"],
+    local_include_dirs: ["include", "src"],
 }
 
 cc_binary {
@@ -20,7 +20,7 @@ cc_binary {
         "src/cfg.c",
     ],
     cflags: ["-Wno-error"],
-    local_include_dirs: ["lib"],
+    local_include_dirs: ["include", "lib"],
 }
 
 cc_binary {
@@ -31,5 +31,5 @@ cc_binary {
         "src/lookup.c",
     ],
     cflags: ["-Wno-error"],
-    local_include_dirs: ["lib"],
+    local_include_dirs: ["include", "lib"],
 }
