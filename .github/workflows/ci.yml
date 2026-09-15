@@ -38,7 +38,6 @@ jobs:
           - debian:testing
           - debian:stable
           - debian:bookworm
-          - debian:bullseye
           # Fails on configure on GCC and clang (process restrictions?)
           # - fedora:rawhide
           - fedora:latest
